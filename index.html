@@ -1,1 +1,286 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>IT Global - Вход</title>
+    <link rel="icon" type="image/png" href="https://i.ibb.co/RkJWBxDb/i.webp">
+    <link rel="apple-touch-icon" href="https://i.ibb.co/RkJWBxDb/i.webp">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0A0F1E 0%, #1a1f2e 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-container {
+            max-width: 450px;
+            width: 100%;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .logo-img {
+            width: 80px;
+            height: 80px;
+            border-radius: 20px;
+            object-fit: cover;
+            margin-bottom: 16px;
+        }
+
+        .logo-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: white;
+        }
+
+        .logo-sub {
+            font-size: 14px;
+            color: rgba(255,255,255,0.6);
+            margin-top: 8px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 32px;
+            padding: 32px 28px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #1c1c1e;
+            font-size: 14px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e5e5ea;
+            border-radius: 16px;
+            font-size: 16px;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #0055ff;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 16px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #0055ff;
+            color: white;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .error-message {
+            background: #ffe5e5;
+            color: #ff3b30;
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 14px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .info-text {
+            text-align: center;
+            font-size: 12px;
+            color: #8e8e93;
+            margin-top: 20px;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 24px;
+            font-size: 12px;
+            color: rgba(255,255,255,0.5);
+        }
+
+        .footer a {
+            color: rgba(255,255,255,0.7);
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">
+            <img src="https://i.ibb.co/RkJWBxDb/i.webp" alt="IT Global" class="logo-img">
+            <div class="logo-title">IT Global</div>
+            <div class="logo-sub">Корпоративный портал</div>
+        </div>
+
+        <div class="card">
+            <div id="errorMessage" class="error-message"></div>
+            
+            <div class="form-group">
+                <label>🔐 Специальный код доступа</label>
+                <input type="password" id="accessCode" placeholder="Введите код доступа" autocomplete="off">
+            </div>
+
+            <div class="form-group">
+                <label>🆔 Global ID</label>
+                <input type="text" id="globalId" placeholder="Ваш Global ID" autocomplete="off">
+                <div class="info-text" style="margin-top: 5px; text-align: left;">Ваш уникальный идентификатор из профиля</div>
+            </div>
+
+            <div class="form-group">
+                <label>🔑 Пароль</label>
+                <input type="password" id="password" placeholder="Ваш пароль" autocomplete="current-password">
+            </div>
+
+            <button class="btn" onclick="login()">Войти в систему</button>
+            
+            <div class="info-text">
+                Введите специальный код, Global ID и пароль для входа
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>© 2026 IT Global. Все права защищены.</p>
+            <p>Связь с разработчиком: <a href="mailto:vasiliy.novikov389@gmail.com">vasiliy.novikov389@gmail.com</a></p>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyA6GGJxAiao77U7_9mBUEjftmS_FnSWbIw",
+            authDomain: "glob-data.firebaseapp.com",
+            projectId: "glob-data",
+            storageBucket: "glob-data.firebasestorage.app",
+            messagingSenderId: "122757049174",
+            appId: "1:122757049174:web:ebb425edd0e1a8ea9a44f7"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth();
+        const db = getFirestore();
+
+        const ACCESS_CODE = "devIT2023_5826";
+
+        window.login = async () => {
+            const accessCode = document.getElementById('accessCode').value.trim();
+            const globalId = document.getElementById('globalId').value.trim();
+            const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('errorMessage');
+
+            errorDiv.style.display = 'none';
+            errorDiv.innerHTML = '';
+
+            // Проверка специального кода
+            if (accessCode !== ACCESS_CODE) {
+                errorDiv.innerHTML = '❌ Неверный специальный код доступа';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            if (!globalId || !password) {
+                errorDiv.innerHTML = '❌ Заполните Global ID и пароль';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            try {
+                const loginBtn = document.querySelector('.btn');
+                const originalText = loginBtn.innerHTML;
+                loginBtn.innerHTML = '⏳ Поиск пользователя...';
+                loginBtn.disabled = true;
+
+                // Ищем пользователя по полю globalId в Firestore
+                const usersRef = collection(db, "users");
+                const q = query(usersRef, where("globalId", "==", globalId));
+                const querySnapshot = await getDocs(q);
+
+                if (querySnapshot.empty) {
+                    throw new Error('Пользователь с таким Global ID не найден');
+                }
+
+                const userDoc = querySnapshot.docs[0];
+                const userData = userDoc.data();
+                const email = userData.email;
+                const role = userData.role;
+
+                if (!email) {
+                    throw new Error('У пользователя не указан email в базе');
+                }
+
+                if (role !== 'admin' && role !== 'employee') {
+                    throw new Error('У вас нет доступа к корпоративному порталу');
+                }
+
+                loginBtn.innerHTML = '⏳ Авторизация...';
+
+                // Авторизуемся через email и пароль
+                await signInWithEmailAndPassword(auth, email, password);
+
+                // Перенаправляем в зависимости от роли
+                if (role === 'admin') {
+                    window.location.href = 'admin.html';
+                } else if (role === 'employee') {
+                    window.location.href = 'employee.html';
+                }
+
+            } catch (err) {
+                let errorText = '❌ Ошибка входа: ';
+                if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+                    errorText += 'Неверный пароль';
+                } else if (err.message) {
+                    errorText += err.message;
+                } else {
+                    errorText += 'Проверьте данные и попробуйте снова';
+                }
+                errorDiv.innerHTML = errorText;
+                errorDiv.style.display = 'block';
+                
+                const loginBtn = document.querySelector('.btn');
+                loginBtn.innerHTML = 'Войти в систему';
+                loginBtn.disabled = false;
+            }
+        };
+
+        // Обработка нажатия Enter
+        const inputs = ['accessCode', 'globalId', 'password'];
+        inputs.forEach(id => {
+            document.getElementById(id).addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') login();
+            });
+        });
+    </script>
+</body>
+  </html>
