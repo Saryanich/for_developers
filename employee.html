@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>IT Global - Панель сотрудника</title>
+    <link rel="icon" type="image/png" href="https://i.ibb.co/RkJWBxDb/i.webp">
+    <link rel="apple-touch-icon" href="https://i.ibb.co/RkJWBxDb/i.webp">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background: #f5f7fa; 
+            min-height: 100vh; 
+            padding: 20px;
+        }
+        .container { max-width: 1200px; width: 100%; margin: 0 auto; }
+        .card { background: white; border-radius: 24px; padding: 28px 24px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+        .header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
+        .logo-area { display: flex; align-items: center; gap: 12px; }
+        .logo-img { width: 44px; height: 44px; border-radius: 12px; object-fit: cover; }
+        .logo-title { font-size: 24px; font-weight: 600; color: #1c1c1e; }
+        .employee-badge { background: #34c759; color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; }
+        .points-card { background: linear-gradient(135deg, #0055ff, #00aaff); color: white; padding: 20px; border-radius: 20px; margin-bottom: 20px; text-align: center; }
+        .points-value { font-size: 48px; font-weight: bold; }
+        .btn { padding: 10px 20px; border: none; border-radius: 14px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .btn:active { transform: scale(0.97); }
+        .btn-primary { background: #0055ff; color: white; }
+        .btn-success { background: #34c759; color: white; }
+        .btn-danger { background: #ff3b30; color: white; }
+        .btn-outline { background: transparent; border: 1px solid #e5e5ea; color: #1c1c1e; }
+        .task-card, .assignment-card {
+            background: #f8f9fc;
+            border-radius: 18px;
+            padding: 20px;
+            margin-bottom: 16px;
+            border: 1px solid #e5e5ea;
+        }
+        .task-header, .assignment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #e5e5ea;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .badge-available { background: #e6f7e6; color: #2e7d32; }
+        .badge-pending { background: #fff3e0; color: #e67700; }
+        .badge-checking { background: #ffe0b3; color: #cc7b00; }
+        .badge-completed { background: #d4f0ff; color: #0055ff; }
+        .tabs {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 10px;
+        }
+        .tab {
+            padding: 10px 24px;
+            background: transparent;
+            border: none;
+            font-size: 16px;
+            font-weight: 600;
+            color: #8e8e93;
+            cursor: pointer;
+            border-radius: 40px;
+        }
+        .tab.active {
+            background: #0055ff;
+            color: white;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 24px;
+            padding: 24px;
+            max-width: 500px;
+            width: 90%;
+        }
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 500; }
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e5e5ea;
+            border-radius: 12px;
+            font-size: 14px;
+        }
+        .flex-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+        .countdown { font-size: 14px; color: #ff9500; margin-top: 10px; }
+        .footer {
+            text-align: center;
+            padding: 24px 16px 16px;
+            font-size: 12px;
+            color: #8e8e93;
+            border-top: 1px solid #e5e5ea;
+            margin-top: 20px;
+        }
+        .footer a { color: #0055ff; text-decoration: none; }
+        @media (max-width: 768px) {
+            .header { flex-direction: column; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="header">
+                <div class="logo-area">
+                    <img src="https://i.ibb.co/RkJWBxDb/i.webp" alt="IT Global" class="logo-img">
+                    <div><span class="logo-title">IT Global</span><span class="employee-badge">Сотрудник</span></div>
+                </div>
+                <button class="btn btn-outline" onclick="logout()">Выйти</button>
+            </div>
+            
+            <div class="points-card">
+                <div style="font-size: 16px; opacity: 0.9;">Мои баллы</div>
+                <div class="points-value" id="userPoints">0</div>
+                <div style="font-size: 14px; opacity: 0.8; margin-top: 8px;" id="userGlobalId"></div>
+            </div>
+            
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('available')">📋 Доступные задания</button>
+                <button class="tab" onclick="switchTab('myTasks')">📌 Мои задания</button>
+                <button class="tab" onclick="switchTab('history')">📜 История</button>
+            </div>
+            
+            <div id="availableTasks"></div>
+            <div id="myTasks" style="display: none;"></div>
+            <div id="history" style="display: none;"></div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>© 2026 IT Global. Все права защищены.</p>
+        <p>Связь с разработчиком: <a href="mailto:vasiliy.novikov389@gmail.com">vasiliy.novikov389@gmail.com</a></p>
+    </div>
+
+    <div id="submitModal" class="modal">
+        <div class="modal-content">
+            <h3 style="margin-bottom: 16px;">Отправить задание на проверку</h3>
+            <div class="form-group">
+                <label>Ваш email (куда отправить файл)</label>
+                <input type="email" id="submitEmail" placeholder="example@mail.com">
+            </div>
+            <div class="form-group">
+                <label>Файл с выполненной работой</label>
+                <input type="file" id="submitFile" accept=".pdf,.doc,.docx,.zip,.jpg,.png">
+            </div>
+            <p style="font-size: 12px; color: #666;">Файл будет отправлен на указанную почту, а администратор получит уведомление.</p>
+            <div class="flex-row">
+                <button class="btn btn-primary" onclick="submitAssignment()">Отправить на проверку</button>
+                <button class="btn btn-outline" onclick="closeModal()">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, doc, getDoc, getDocs, updateDoc, addDoc, collection, query, where, orderBy, Timestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyA6GGJxAiao77U7_9mBUEjftmS_FnSWbIw",
+            authDomain: "glob-data.firebaseapp.com",
+            projectId: "glob-data",
+            storageBucket: "glob-data.firebasestorage.app",
+            messagingSenderId: "122757049174",
+            appId: "1:122757049174:web:ebb425edd0e1a8ea9a44f7"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth();
+        const db = getFirestore();
+        
+        let currentUserId = null;
+        let currentUserGlobalId = null;
+        let currentTab = 'available';
+        let countdownIntervals = {};
+        
+        async function loadUserData() {
+            if (!currentUserId) return;
+            const userSnap = await getDoc(doc(db, "users", currentUserId));
+            const userData = userSnap.data();
+            const points = userData?.points || 0;
+            const globalId = userData?.globalId || '—';
+            currentUserGlobalId = globalId;
+            document.getElementById('userPoints').innerText = points;
+            document.getElementById('userGlobalId').innerHTML = `🆔 Global ID: ${globalId}`;
+        }
+        
+        async function loadAvailableTasks() {
+            const tasksSnap = await getDocs(query(collection(db, "tasks"), where("status", "==", "active"), orderBy("createdAt", "desc")));
+            const tasks = [];
+            for (const docSnap of tasksSnap.docs) {
+                const task = { id: docSnap.id, ...docSnap.data() };
+                const existing = await getDocs(query(collection(db, "task_assignments"), 
+                    where("taskId", "==", task.id), where("userId", "==", currentUserId)));
+                if (existing.empty && (!task.assigneeId || task.assigneeId === currentUserId)) {
+                    tasks.push(task);
+                }
+            }
+            
+            if (tasks.length === 0) {
+                document.getElementById('availableTasks').innerHTML = '<div class="task-card">✨ Нет доступных заданий</div>';
+                return;
+            }
+            
+            let html = '';
+            for (const task of tasks) {
+                html += `
+                    <div class="task-card">
+                        <div class="task-header">
+                            <div><strong>${task.title}</strong></div>
+                            <div>⭐ ${task.reward} баллов</div>
+                        </div>
+                        <div style="margin-bottom: 12px;">📝 ${task.description}</div>
+                        <button class="btn btn-success" onclick="takeTask('${task.id}', ${task.reward})">📌 Взять задание</button>
+                    </div>
+                `;
+            }
+            document.getElementById('availableTasks').innerHTML = html;
+        }
+        
+        async function loadMyTasks() {
+            const assignmentsSnap = await getDocs(query(collection(db, "task_assignments"), 
+                where("userId", "==", currentUserId), orderBy("takenAt", "desc")));
+            const assignments = [];
+            assignmentsSnap.forEach(doc => assignments.push({ id: doc.id, ...doc.data() }));
+            
+            if (assignments.length === 0) {
+                document.getElementById('myTasks').innerHTML = '<div class="assignment-card">📭 Вы ещё не взяли ни одного задания</div>';
+                return;
+            }
+            
+            let html = '';
+            for (const ass of assignments) {
+                const taskSnap = await getDoc(doc(db, "tasks", ass.taskId));
+                const task = taskSnap.data();
+                const statusText = { pending: 'В работе', checking: 'На проверке', completed: 'Выполнено' }[ass.status];
+                const statusClass = ass.status === 'pending' ? 'badge-pending' : (ass.status === 'checking' ? 'badge-checking' : 'badge-completed');
+                const canSubmit = ass.status === 'pending' && (!ass.takenAt || (Date.now() - ass.takenAt.toDate().getTime() >= 60000));
+                const timeLeft = ass.takenAt ? Math.max(0, 60 - Math.floor((Date.now() - ass.takenAt.toDate().getTime()) / 1000)) : 0;
+                
+                html += `
+                    <div class="assignment-card" id="assignment-${ass.id}">
+                        <div class="assignment-header">
+                            <div><strong>${task?.title || 'Задание удалено'}</strong> <span class="badge ${statusClass}">${statusText}</span></div>
+                            <div>⭐ ${task?.reward || 0} баллов</div>
+                        </div>
+                        <div><strong>📅 Взято:</strong> ${ass.takenAt?.toDate().toLocaleString() || '—'}</div>
+                        ${ass.submittedAt ? `<div><strong>📤 Отправлено:</strong> ${ass.submittedAt.toDate().toLocaleString()}</div>` : ''}
+                        ${ass.status === 'pending' && !ass.submittedAt ? `
+                            <div id="countdown-${ass.id}" class="countdown">${canSubmit ? '✅ Можно отправлять!' : `⏳ Кнопка появится через ${timeLeft} сек`}</div>
+                            ${canSubmit ? `<button class="btn btn-primary" onclick="openSubmitModal('${ass.id}')">📧 Отправить на проверку</button>` : ''}
+                        ` : ''}
+                        ${ass.status === 'checking' ? '<div style="color:#ff9500;">⏳ Ожидает проверки администратора...</div>' : ''}
+                        ${ass.status === 'completed' ? '<div style="color:#34c759;">✅ Задание выполнено!</div>' : ''}
+                    </div>
+                `;
+                
+                if (!canSubmit && ass.status === 'pending' && !ass.submittedAt && timeLeft > 0) {
+                    if (countdownIntervals[ass.id]) clearInterval(countdownIntervals[ass.id]);
+                    countdownIntervals[ass.id] = setInterval(() => {
+                        const newTimeLeft = Math.max(0, 60 - Math.floor((Date.now() - ass.takenAt.toDate().getTime()) / 1000));
+                        const countdownEl = document.getElementById(`countdown-${ass.id}`);
+                        if (countdownEl) {
+                            if (newTimeLeft <= 0) {
+                                countdownEl.innerHTML = '✅ Можно отправлять!';
+                                const btnContainer = document.getElementById(`assignment-${ass.id}`);
+                                if (btnContainer && !btnContainer.querySelector('.btn-primary')) {
+                                    const btn = document.createElement('button');
+                                    btn.className = 'btn btn-primary';
+                                    btn.innerHTML = '📧 Отправить на проверку';
+                                    btn.onclick = () => openSubmitModal(ass.id);
+                                    btnContainer.appendChild(btn);
+                                }
+                                clearInterval(countdownIntervals[ass.id]);
+                            } else {
+                                countdownEl.innerHTML = `⏳ Кнопка появится через ${newTimeLeft} сек`;
+                            }
+                        } else {
+                            clearInterval(countdownIntervals[ass.id]);
+                        }
+                    }, 1000);
+                }
+            }
+            document.getElementById('myTasks').innerHTML = html;
+        }
+        
+        async function loadHistory() {
+            const assignmentsSnap = await getDocs(query(collection(db, "task_assignments"), 
+                where("userId", "==", currentUserId), where("status", "==", "completed"), orderBy("completedAt", "desc")));
+            const assignments = [];
+            assignmentsSnap.forEach(doc => assignments.push({ id: doc.id, ...doc.data() }));
+            
+            if (assignments.length === 0) {
+                document.getElementById('history').innerHTML = '<div class="assignment-card">📜 Нет выполненных заданий</div>';
+                return;
+            }
+            
+            let html = '';
+            for (const ass of assignments) {
+                const taskSnap = await getDoc(doc(db, "tasks", ass.taskId));
+                const task = taskSnap.data();
+                html += `
+                    <div class="assignment-card">
+                        <div class="assignment-header">
+                            <div><strong>${task?.title || 'Задание удалено'}</strong></div>
+                            <div>⭐ ${task?.reward || 0} баллов</div>
+                        </div>
+                        <div><strong>✅ Выполнено:</strong> ${ass.completedAt?.toDate().toLocaleString() || '—'}</div>
+                    </div>
+                `;
+            }
+            document.getElementById('history').innerHTML = html;
+        }
+        
+        window.takeTask = async (taskId, reward) => {
+            if (confirm('Взять задание? У вас будет 1 минута до отправки на проверку.')) {
+                await addDoc(collection(db, "task_assignments"), {
+                    taskId: taskId,
+                    userId: currentUserId,
+                    status: "pending",
+                    takenAt: Timestamp.now(),
+                    reward: reward
+                });
+                alert('Задание взято! Через 1 минуту появится кнопка отправки.');
+                loadAvailableTasks();
+                loadMyTasks();
+            }
+        };
+        
+        let currentAssignmentId = null;
+        window.openSubmitModal = (assignmentId) => {
+            currentAssignmentId = assignmentId;
+            document.getElementById('submitEmail').value = '';
+            document.getElementById('submitFile').value = '';
+            document.getElementById('submitModal').style.display = 'flex';
+        };
+        
+        window.submitAssignment = async () => {
+            const email = document.getElementById('submitEmail').value;
+            const file = document.getElementById('submitFile').files[0];
+            
+            if (!email || !file) {
+                alert('Заполните email и выберите файл');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const fileData = e.target.result.split(',')[1];
+                const subject = encodeURIComponent(`Задание на проверку #${currentAssignmentId} (Global ID: ${currentUserGlobalId})`);
+                const body = encodeURIComponent(`Сотрудник с Global ID: ${currentUserGlobalId}\n\nФайл (base64):\n${fileData.substring(0, 500)}...\n\nПолный файл отправлен в виде вложения.`);
+                window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+                
+                await updateDoc(doc(db, "task_assignments", currentAssignmentId), {
+                    status: "checking",
+                    submittedAt: Timestamp.now(),
+                    submittedEmail: email,
+                    fileName: file.name
+                });
+                
+                alert('Задание отправлено на проверку! Администратор рассмотрит его в ближайшее время.');
+                closeModal();
+                loadMyTasks();
+                if (currentTab === 'myTasks') loadMyTasks();
+            };
+            reader.readAsDataURL(file);
+        };
+        
+        window.closeModal = () => {
+            document.getElementById('submitModal').style.display = 'none';
+            currentAssignmentId = null;
+        };
+        
+        window.switchTab = (tab) => {
+            currentTab = tab;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            document.getElementById('availableTasks').style.display = tab === 'available' ? 'block' : 'none';
+            document.getElementById('myTasks').style.display = tab === 'myTasks' ? 'block' : 'none';
+            document.getElementById('history').style.display = tab === 'history' ? 'block' : 'none';
+            
+            if (tab === 'available') loadAvailableTasks();
+            else if (tab === 'myTasks') loadMyTasks();
+            else if (tab === 'history') loadHistory();
+        };
+        
+        window.logout = async () => {
+            await signOut(auth);
+            window.location.href = 'index.html';
+        };
+        
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                const userDoc = await getDoc(doc(db, "users", user.uid));
+                const role = userDoc.data()?.role;
+                if (role !== 'admin' && role !== 'employee') {
+                    window.location.href = 'index.html';
+                    return;
+                }
+                currentUserId = user.uid;
+                await loadUserData();
+                loadAvailableTasks();
+                loadMyTasks();
+                loadHistory();
+            } else {
+                window.location.href = 'index.html';
+            }
+        });
+    </script>
+</body>
+</html>
