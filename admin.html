@@ -37,6 +37,7 @@
         .btn-danger { background: #ff3b30; color: white; }
         .btn-warning { background: #ff9500; color: white; }
         .btn-outline { background: transparent; border: 1px solid #e5e5ea; color: #1c1c1e; }
+        .btn-secondary { background: #8e8e93; color: white; }
         .main-tabs {
             display: flex;
             gap: 12px;
@@ -74,14 +75,14 @@
         }
         .stat-number { font-size: 32px; font-weight: bold; }
         .stat-label { font-size: 14px; margin-top: 5px; opacity: 0.9; }
-        .employee-card, .task-card, .assignment-card {
+        .employee-card, .task-card, .assignment-card, .request-card {
             background: #f8f9fc;
             border-radius: 18px;
             padding: 20px;
             margin-bottom: 16px;
             border: 1px solid #e5e5ea;
         }
-        .employee-header, .task-header {
+        .employee-header, .task-header, .request-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -102,6 +103,7 @@
         .badge-pending { background: #fff3e0; color: #e67700; }
         .badge-completed { background: #e6f7e6; color: #2e7d32; }
         .badge-checking { background: #ffe0b3; color: #cc7b00; }
+        .badge-new { background: #e3f2fd; color: #0055ff; }
         .modal {
             display: none;
             position: fixed;
@@ -157,6 +159,7 @@
                 <button class="main-tab" onclick="switchMainTab('tasks')">📋 Задания</button>
                 <button class="main-tab" onclick="switchMainTab('assignments')">✅ Выполнения</button>
                 <button class="main-tab" onclick="switchMainTab('transactions')">📊 Транзакции</button>
+                <button class="main-tab" onclick="switchMainTab('joinRequests')">📝 Заявки</button>
             </div>
             
             <div id="employeesSection">
@@ -183,6 +186,11 @@
                 <div class="stats-grid" id="transactionsStats"></div>
                 <div id="transactionsList">Загрузка...</div>
             </div>
+
+            <div id="joinRequestsSection" style="display: none;">
+                <div class="stats-grid" id="joinRequestsStats"></div>
+                <div id="joinRequestsList">Загрузка...</div>
+            </div>
         </div>
     </div>
 
@@ -191,7 +199,7 @@
         <p>Связь с разработчиком: <a href="mailto:vasiliy.novikov389@gmail.com">vasiliy.novikov389@gmail.com</a></p>
     </div>
 
-    <!-- Модалка добавления сотрудника через Global ID -->
+    <!-- Модалка добавления сотрудника -->
     <div id="employeeModal" class="modal">
         <div class="modal-content">
             <h3 style="margin-bottom: 16px;">Добавить сотрудника</h3>
@@ -207,7 +215,7 @@
         </div>
     </div>
 
-    <!-- Модалка начисления/списания баллов -->
+    <!-- Модалка изменения баллов -->
     <div id="pointsModal" class="modal">
         <div class="modal-content">
             <h3 style="margin-bottom: 16px;">Изменить баллы сотрудника</h3>
@@ -227,7 +235,7 @@
                 <label>Действие</label>
                 <select id="pointsAction" style="width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #e5e5ea;">
                     <option value="add">➕ Начислить баллы</option>
-                    <option value="remove" class="text-danger">➖ Списать баллы</option>
+                    <option value="remove">➖ Списать баллы</option>
                 </select>
             </div>
             <div class="form-group">
@@ -291,6 +299,7 @@
         let currentEmployeeId = null;
         let currentEmployeePoints = 0;
 
+        // ========== СОТРУДНИКИ ==========
         async function loadEmployees() {
             const q = query(collection(db, "users"), where("role", "in", ["admin", "employee"]));
             const snapshot = await getDocs(q);
@@ -455,6 +464,7 @@
             if (currentTab === 'transactions') loadTransactions();
         };
         
+        // ========== ЗАДАНИЯ ==========
         async function loadTasks() {
             const snapshot = await getDocs(query(collection(db, "tasks"), orderBy("createdAt", "desc")));
             const tasks = [];
@@ -537,6 +547,7 @@
             }
         };
         
+        // ========== ВЫПОЛНЕНИЯ ==========
         async function loadAssignments() {
             const snapshot = await getDocs(query(collection(db, "task_assignments"), orderBy("takenAt", "desc")));
             const assignments = [];
@@ -625,6 +636,7 @@
             }
         };
         
+        // ========== ТРАНЗАКЦИИ ==========
         async function loadTransactions() {
             const snapshot = await getDocs(query(collection(db, "points_transactions"), orderBy("createdAt", "desc")));
             const transactions = [];
@@ -653,7 +665,7 @@
                     <div class="assignment-card">
                         <div class="employee-header">
                             <div><strong>${userName}</strong></div>
-                            <div class="${isPositive ? 'text-success' : 'text-danger'}" style="font-weight: bold;">${isPositive ? '+' : ''}${tx.amount} баллов</div>
+                            <div style="${isPositive ? 'color: #34c759;' : 'color: #ff3b30;'} font-weight: bold;">${isPositive ? '+' : ''}${tx.amount} баллов</div>
                         </div>
                         <div><strong>📅 Дата:</strong> ${date}</div>
                         <div><strong>📝 Основание:</strong> ${tx.reason || '—'}</div>
@@ -663,6 +675,67 @@
             document.getElementById('transactionsList').innerHTML = html;
         }
         
+        // ========== ЗАЯВКИ С ПРОМО-СТРАНИЦЫ ==========
+        async function loadJoinRequests() {
+            const q = query(collection(db, "join_requests"), orderBy("createdAt", "desc"));
+            const snapshot = await getDocs(q);
+            const requests = [];
+            snapshot.forEach(doc => requests.push({ id: doc.id, ...doc.data() }));
+            
+            const newCount = requests.filter(r => r.status === 'pending').length;
+            
+            document.getElementById('joinRequestsStats').innerHTML = `
+                <div class="stat-card"><div class="stat-number">${requests.length}</div><div class="stat-label">📋 Всего заявок</div></div>
+                <div class="stat-card"><div class="stat-number">${newCount}</div><div class="stat-label">🆕 Новых</div></div>
+            `;
+            
+            if (requests.length === 0) {
+                document.getElementById('joinRequestsList').innerHTML = '<div class="request-card">Нет заявок</div>';
+                return;
+            }
+            
+            let html = '';
+            for (const req of requests) {
+                const statusClass = req.status === 'pending' ? 'badge-new' : 'badge-completed';
+                const statusText = req.status === 'pending' ? '🆕 Новая' : '✅ Обработана';
+                
+                html += `
+                    <div class="request-card">
+                        <div class="request-header">
+                            <div><strong>${req.fullname}</strong> <span class="badge ${statusClass}">${statusText}</span></div>
+                            <div>📅 ${req.createdAt?.toDate().toLocaleString() || '—'}</div>
+                        </div>
+                        <div><strong>📱 Телефон:</strong> ${req.phone}</div>
+                        <div><strong>📧 Telegram:</strong> ${req.telegram || '—'}</div>
+                        <div><strong>🎂 Дата рождения:</strong> ${req.birthdate || '—'}</div>
+                        <div><strong>💭 О себе:</strong> ${req.about || '—'}</div>
+                        <div class="flex-row" style="margin-top: 16px;">
+                            ${req.status === 'pending' ? `<button class="btn btn-success" onclick="markRequestProcessed('${req.id}')">✅ Отметить обработанной</button>` : ''}
+                            <button class="btn btn-danger" onclick="deleteRequest('${req.id}')">🗑 Удалить</button>
+                        </div>
+                    </div>
+                `;
+            }
+            document.getElementById('joinRequestsList').innerHTML = html;
+        }
+        
+        window.markRequestProcessed = async (requestId) => {
+            if (confirm('Отметить заявку как обработанную?')) {
+                await updateDoc(doc(db, "join_requests", requestId), { status: "processed" });
+                alert('Заявка отмечена как обработанная');
+                loadJoinRequests();
+            }
+        };
+        
+        window.deleteRequest = async (requestId) => {
+            if (confirm('Удалить заявку?')) {
+                await deleteDoc(doc(db, "join_requests", requestId));
+                alert('Заявка удалена');
+                loadJoinRequests();
+            }
+        };
+        
+        // ========== ОБЩИЕ ФУНКЦИИ ==========
         window.closeModal = (id) => {
             document.getElementById(id).style.display = 'none';
         };
@@ -676,11 +749,13 @@
             document.getElementById('tasksSection').style.display = tab === 'tasks' ? 'block' : 'none';
             document.getElementById('assignmentsSection').style.display = tab === 'assignments' ? 'block' : 'none';
             document.getElementById('transactionsSection').style.display = tab === 'transactions' ? 'block' : 'none';
+            document.getElementById('joinRequestsSection').style.display = tab === 'joinRequests' ? 'block' : 'none';
             
             if (tab === 'employees') loadEmployees();
             else if (tab === 'tasks') loadTasks();
             else if (tab === 'assignments') loadAssignments();
             else if (tab === 'transactions') loadTransactions();
+            else if (tab === 'joinRequests') loadJoinRequests();
         };
         
         window.logout = async () => {
@@ -688,6 +763,7 @@
             window.location.href = 'index.html';
         };
         
+        // ========== АВТОРИЗАЦИЯ ==========
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 const userDoc = await getDoc(doc(db, "users", user.uid));
