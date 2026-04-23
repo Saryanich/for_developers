@@ -104,6 +104,13 @@
             transform: scale(0.98);
         }
 
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid #e5e5ea;
+            color: #1c1c1e;
+            margin-top: 12px;
+        }
+
         .error-message {
             background: #ffe5e5;
             color: #ff3b30;
@@ -132,6 +139,64 @@
             color: rgba(255,255,255,0.7);
             text-decoration: none;
         }
+
+        /* 2FA стили */
+        .code-input-container {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        .code-input {
+            width: 60px;
+            height: 70px;
+            text-align: center;
+            font-size: 32px;
+            font-weight: bold;
+            border: 2px solid #e5e5ea;
+            border-radius: 16px;
+            background: white;
+            color: #1c1c1e;
+        }
+        .code-input:focus {
+            outline: none;
+            border-color: #0055ff;
+        }
+        .warning-box {
+            background: #fff3e0;
+            border: 1px solid #ff9500;
+            border-radius: 12px;
+            padding: 12px;
+            margin: 16px 0;
+            color: #e67700;
+            font-size: 12px;
+        }
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #666;
+            font-size: 13px;
+            margin: 16px 0;
+            cursor: pointer;
+        }
+        .device-info {
+            background: #e3f2fd;
+            border: 1px solid #0055ff;
+            border-radius: 12px;
+            padding: 12px;
+            margin: 16px 0;
+            color: #0055ff;
+            font-size: 12px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease;
+        }
     </style>
 </head>
 <body>
@@ -142,18 +207,13 @@
             <div class="logo-sub">Корпоративный портал</div>
         </div>
 
-        <div class="card">
+        <!-- Основная форма входа -->
+        <div id="loginForm" class="card">
             <div id="errorMessage" class="error-message"></div>
             
             <div class="form-group">
-                <label>🔐 Специальный код доступа</label>
-                <input type="password" id="accessCode" placeholder="Введите код доступа" autocomplete="off">
-            </div>
-
-            <div class="form-group">
                 <label>🆔 Global ID</label>
                 <input type="text" id="globalId" placeholder="Ваш Global ID" autocomplete="off">
-                <div class="info-text" style="margin-top: 5px; text-align: left;">Ваш уникальный идентификатор из профиля</div>
             </div>
 
             <div class="form-group">
@@ -164,8 +224,44 @@
             <button class="btn" onclick="login()">Войти в систему</button>
             
             <div class="info-text">
-                Введите специальный код, Global ID и пароль для входа
+                Введите Global ID и пароль для входа
             </div>
+        </div>
+
+        <!-- 2FA форма (только для новых устройств) -->
+        <div id="twoFactorForm" class="card" style="display: none;">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <div style="font-size: 40px; margin-bottom: 10px;">🔐</div>
+                <h3 style="color: #1c1c1e; margin-bottom: 8px;">Подтверждение входа</h3>
+                <p style="color: #666; font-size: 13px;">Введите код из приложения Global ID</p>
+            </div>
+            
+            <div id="deviceInfo" class="device-info">
+                <strong>🆕 Новое устройство</strong><br>
+                Для входа требуется код подтверждения
+            </div>
+            
+            <div class="code-input-container">
+                <input type="text" class="code-input" maxlength="1" id="code1" oninput="moveToNext(this, 0)" inputmode="numeric">
+                <input type="text" class="code-input" maxlength="1" id="code2" oninput="moveToNext(this, 1)" inputmode="numeric">
+                <input type="text" class="code-input" maxlength="1" id="code3" oninput="moveToNext(this, 2)" inputmode="numeric">
+                <input type="text" class="code-input" maxlength="1" id="code4" oninput="moveToNext(this, 3)" inputmode="numeric">
+            </div>
+            
+            <div class="warning-box">
+                <strong>⚠️ Внимание!</strong><br>
+                Никогда не сообщайте этот код никому.
+            </div>
+            
+            <label class="checkbox-label">
+                <input type="checkbox" id="trustDevice" checked>
+                <span>✅ Запомнить это устройство (больше не запрашивать код)</span>
+            </label>
+            
+            <button class="btn" onclick="verify2FA()">Подтвердить</button>
+            <button class="btn btn-secondary" onclick="cancel2FA()">Назад</button>
+            
+            <div id="twoFactorMessage" class="error-message" style="display: none;"></div>
         </div>
 
         <div class="footer">
@@ -176,8 +272,8 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, doc, getDoc, getDocs, updateDoc, collection, query, where, arrayUnion, Timestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyA6GGJxAiao77U7_9mBUEjftmS_FnSWbIw",
@@ -192,70 +288,216 @@
         const auth = getAuth();
         const db = getFirestore();
 
-        const ACCESS_CODE = "devIT2023_5826";
+        // Отключаем сохранение сессии Firebase (ручное управление)
+        auth.setPersistence({ type: 'NONE' });
 
+        let deviceFingerprint = null;
+        let pendingUser = null;
+
+        // ==================== ФУНКЦИИ ДЛЯ РАБОТЫ С УСТРОЙСТВАМИ ====================
+        
+        async function getDeviceInfo() {
+            try {
+                const ipResponse = await fetch('https://api.ipify.org?format=json');
+                const ipData = await ipResponse.json();
+                currentIP = ipData.ip;
+            } catch(e) { currentIP = 'unknown'; }
+            
+            const nav = window.navigator;
+            deviceFingerprint = btoa(`${nav.userAgent}-${nav.language}-${screen.width}x${screen.height}-${nav.platform}-${new Date().getTimezoneOffset()}`);
+            return deviceFingerprint;
+        }
+
+        async function isDeviceKnown(uid) {
+            const userDoc = await getDoc(doc(db, "users", uid));
+            const data = userDoc.data();
+            const knownDevices = data?.knownDevices || [];
+            return knownDevices.some(d => d.fingerprint === deviceFingerprint);
+        }
+
+        async function addKnownDevice(uid) {
+            const deviceInfo = {
+                fingerprint: deviceFingerprint,
+                ip: currentIP,
+                userAgent: navigator.userAgent,
+                addedAt: new Date(),
+                lastUsed: new Date()
+            };
+            await updateDoc(doc(db, "users", uid), {
+                knownDevices: arrayUnion(deviceInfo)
+            });
+        }
+
+        async function hasIcebergAccess(uid) {
+            const userDoc = await getDoc(doc(db, "users", uid));
+            const data = userDoc.data();
+            return data?.icebergAccess === true;
+        }
+
+        async function isAccountLocked(uid) {
+            const userDoc = await getDoc(doc(db, "users", uid));
+            const data = userDoc.data();
+            return data?.accountLocked === true;
+        }
+
+        // ==================== АВТОВХОД ====================
+        
+        async function tryAutoLogin() {
+            // Получаем сохранённый UID из localStorage
+            const savedUid = localStorage.getItem('iceberg_uid');
+            if (!savedUid) return false;
+            
+            await getDeviceInfo();
+            
+            try {
+                // Проверяем, что устройство запомнено
+                const isKnown = await isDeviceKnown(savedUid);
+                if (!isKnown) return false;
+                
+                // Проверяем блокировку
+                if (await isAccountLocked(savedUid)) {
+                    localStorage.removeItem('iceberg_uid');
+                    return false;
+                }
+                
+                // Получаем данные пользователя
+                const userDoc = await getDoc(doc(db, "users", savedUid));
+                if (!userDoc.exists()) return false;
+                
+                const userData = userDoc.data();
+                const role = userData.role;
+                
+                if (role !== 'admin' && role !== 'employee') {
+                    return false;
+                }
+                
+                // Обновляем онлайн статус
+                await updateDoc(doc(db, "users", savedUid), {
+                    online: true,
+                    lastSeen: Timestamp.now()
+                }).catch(() => {});
+                
+                // Перенаправляем
+                if (role === 'admin') {
+                    window.location.href = 'admin.html';
+                } else {
+                    window.location.href = 'employee.html';
+                }
+                return true;
+                
+            } catch (error) {
+                console.error('Автовход не удался:', error);
+                localStorage.removeItem('iceberg_uid');
+                return false;
+            }
+        }
+
+        // ==================== ВХОД С ПАРОЛЕМ ====================
+        
         window.login = async () => {
-            const accessCode = document.getElementById('accessCode').value.trim();
             const globalId = document.getElementById('globalId').value.trim();
             const password = document.getElementById('password').value;
             const errorDiv = document.getElementById('errorMessage');
-
+            
             errorDiv.style.display = 'none';
             errorDiv.innerHTML = '';
-
-            // Проверка специального кода
-            if (accessCode !== ACCESS_CODE) {
-                errorDiv.innerHTML = '❌ Неверный специальный код доступа';
-                errorDiv.style.display = 'block';
-                return;
-            }
-
+            
             if (!globalId || !password) {
                 errorDiv.innerHTML = '❌ Заполните Global ID и пароль';
                 errorDiv.style.display = 'block';
                 return;
             }
-
+            
+            await getDeviceInfo();
+            
             try {
-                const loginBtn = document.querySelector('.btn');
-                const originalText = loginBtn.innerHTML;
-                loginBtn.innerHTML = '⏳ Поиск пользователя...';
+                const loginBtn = document.querySelector('#loginForm .btn');
+                loginBtn.innerHTML = '⏳ Вход...';
                 loginBtn.disabled = true;
-
-                // Ищем пользователя по полю globalId в Firestore
+                
+                // Ищем пользователя по globalId
                 const usersRef = collection(db, "users");
                 const q = query(usersRef, where("globalId", "==", globalId));
                 const querySnapshot = await getDocs(q);
-
+                
                 if (querySnapshot.empty) {
                     throw new Error('Пользователь с таким Global ID не найден');
                 }
-
+                
                 const userDoc = querySnapshot.docs[0];
+                const userId = userDoc.id;
                 const userData = userDoc.data();
                 const email = userData.email;
                 const role = userData.role;
-
+                
                 if (!email) {
                     throw new Error('У пользователя не указан email в базе');
                 }
-
+                
                 if (role !== 'admin' && role !== 'employee') {
                     throw new Error('У вас нет доступа к корпоративному порталу');
                 }
-
-                loginBtn.innerHTML = '⏳ Авторизация...';
-
-                // Авторизуемся через email и пароль
-                await signInWithEmailAndPassword(auth, email, password);
-
-                // Перенаправляем в зависимости от роли
-                if (role === 'admin') {
-                    window.location.href = 'admin.html';
-                } else if (role === 'employee') {
-                    window.location.href = 'employee.html';
+                
+                if (await isAccountLocked(userId)) {
+                    throw new Error('Аккаунт заблокирован');
                 }
-
+                
+                // Авторизация через email и пароль
+                const userCred = await signInWithEmailAndPassword(auth, email, password);
+                const user = userCred.user;
+                
+                // Проверяем, новое ли устройство
+                const isKnown = await isDeviceKnown(userId);
+                
+                if (isKnown) {
+                    // Запомненное устройство — вход сразу
+                    localStorage.setItem('iceberg_uid', userId);
+                    
+                    await updateDoc(doc(db, "users", userId), {
+                        online: true,
+                        lastSeen: Timestamp.now(),
+                        icebergAccess: true,
+                        icebergLastLogin: Timestamp.now()
+                    }).catch(() => {});
+                    
+                    // Перенаправление
+                    if (role === 'admin') {
+                        window.location.href = 'admin.html';
+                    } else {
+                        window.location.href = 'employee.html';
+                    }
+                } else {
+                    // Новое устройство — запрашиваем 2FA
+                    pendingUser = { uid: userId, role: role, email: email };
+                    
+                    // Генерируем 4-значный код
+                    const code = Math.floor(1000 + Math.random() * 9000).toString();
+                    
+                    await updateDoc(doc(db, "users", userId), {
+                        twoFactorCode: code,
+                        twoFactorCodeExpires: new Date(Date.now() + 5 * 60000)
+                    });
+                    
+                    // Показываем 2FA форму
+                    document.getElementById('deviceInfo').innerHTML = `
+                        <strong>🆕 Новое устройство</strong><br>
+                        <strong>IP:</strong> ${currentIP || 'определяется...'}<br>
+                        <strong>Браузер:</strong> ${navigator.userAgent.substring(0, 50)}...<br>
+                        <strong>Введите код подтверждения</strong>
+                    `;
+                    
+                    document.getElementById('loginForm').style.display = 'none';
+                    document.getElementById('twoFactorForm').style.display = 'block';
+                    
+                    // Очищаем поля кода
+                    for (let i = 1; i <= 4; i++) {
+                        document.getElementById(`code${i}`).value = '';
+                    }
+                    document.getElementById('code1').focus();
+                    
+                    console.log('2FA код (для отладки):', code);
+                }
+                
             } catch (err) {
                 let errorText = '❌ Ошибка входа: ';
                 if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
@@ -268,19 +510,111 @@
                 errorDiv.innerHTML = errorText;
                 errorDiv.style.display = 'block';
                 
-                const loginBtn = document.querySelector('.btn');
+                const loginBtn = document.querySelector('#loginForm .btn');
                 loginBtn.innerHTML = 'Войти в систему';
                 loginBtn.disabled = false;
             }
         };
 
+        // ==================== 2FA ПОДТВЕРЖДЕНИЕ ====================
+        
+        window.verify2FA = async () => {
+            const code = ['code1','code2','code3','code4'].map(id => document.getElementById(id).value).join('');
+            const errorDiv = document.getElementById('twoFactorMessage');
+            
+            errorDiv.style.display = 'none';
+            
+            if (code.length !== 4) {
+                errorDiv.innerHTML = '❌ Введите 4 цифры';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            if (!pendingUser) {
+                errorDiv.innerHTML = '❌ Ошибка сессии';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            try {
+                const userDoc = await getDoc(doc(db, "users", pendingUser.uid));
+                const storedCode = userDoc.data()?.twoFactorCode;
+                
+                if (code === storedCode) {
+                    // Запоминаем устройство, если отмечено
+                    if (document.getElementById('trustDevice').checked) {
+                        await addKnownDevice(pendingUser.uid);
+                        localStorage.setItem('iceberg_uid', pendingUser.uid);
+                    }
+                    
+                    // Обновляем статус
+                    await updateDoc(doc(db, "users", pendingUser.uid), {
+                        twoFactorCode: null,
+                        twoFactorCodeExpires: null,
+                        online: true,
+                        lastSeen: Timestamp.now(),
+                        icebergAccess: true,
+                        icebergLastLogin: Timestamp.now()
+                    });
+                    
+                    // Перенаправление
+                    if (pendingUser.role === 'admin') {
+                        window.location.href = 'admin.html';
+                    } else {
+                        window.location.href = 'employee.html';
+                    }
+                } else {
+                    errorDiv.innerHTML = '❌ Неверный код подтверждения';
+                    errorDiv.style.display = 'block';
+                }
+            } catch (err) {
+                errorDiv.innerHTML = '❌ Ошибка: ' + err.message;
+                errorDiv.style.display = 'block';
+            }
+        };
+
+        window.cancel2FA = () => {
+            document.getElementById('twoFactorForm').style.display = 'none';
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('globalId').value = '';
+            document.getElementById('password').value = '';
+            pendingUser = null;
+        };
+
+        window.moveToNext = (input, index) => {
+            if (input.value.length === 1) {
+                const next = document.getElementById(`code${index + 2}`);
+                if (next) next.focus();
+            }
+            input.value = input.value.replace(/[^0-9]/g, '');
+        };
+
+        // ==================== ПРОВЕРКА АВТОВХОДА ПРИ ЗАГРУЗКЕ ====================
+        
+        // Сначала пробуем автовход
+        tryAutoLogin();
+        
+        // Если автовход не сработал, показываем форму входа
+        // Форма уже видна по умолчанию
+        
         // Обработка нажатия Enter
-        const inputs = ['accessCode', 'globalId', 'password'];
-        inputs.forEach(id => {
-            document.getElementById(id).addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') login();
-            });
+        ['globalId', 'password'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') login();
+                });
+            }
         });
+        
+        for (let i = 1; i <= 4; i++) {
+            const el = document.getElementById(`code${i}`);
+            if (el) {
+                el.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') verify2FA();
+                });
+            }
+        }
     </script>
 </body>
-  </html>
+</html>
