@@ -288,10 +288,9 @@
         const auth = getAuth();
         const db = getFirestore();
 
-        // Отключаем сохранение сессии Firebase (ручное управление)
-        auth.setPersistence({ type: 'NONE' });
-
+        // Переменные состояния
         let deviceFingerprint = null;
+        let currentIP = 'unknown';
         let pendingUser = null;
 
         // ==================== ФУНКЦИИ ДЛЯ РАБОТЫ С УСТРОЙСТВАМИ ====================
@@ -301,9 +300,12 @@
                 const ipResponse = await fetch('https://api.ipify.org?format=json');
                 const ipData = await ipResponse.json();
                 currentIP = ipData.ip;
-            } catch(e) { currentIP = 'unknown'; }
+            } catch(e) { 
+                currentIP = 'unknown'; 
+            }
             
             const nav = window.navigator;
+            // Создаем уникальный отпечаток
             deviceFingerprint = btoa(`${nav.userAgent}-${nav.language}-${screen.width}x${screen.height}-${nav.platform}-${new Date().getTimezoneOffset()}`);
             return deviceFingerprint;
         }
@@ -328,12 +330,6 @@
             });
         }
 
-        async function hasIcebergAccess(uid) {
-            const userDoc = await getDoc(doc(db, "users", uid));
-            const data = userDoc.data();
-            return data?.icebergAccess === true;
-        }
-
         async function isAccountLocked(uid) {
             const userDoc = await getDoc(doc(db, "users", uid));
             const data = userDoc.data();
@@ -343,41 +339,54 @@
         // ==================== АВТОВХОД ====================
         
         async function tryAutoLogin() {
-            // Получаем сохранённый UID из localStorage
+            // 1. Проверяем, есть ли сохраненный UID
             const savedUid = localStorage.getItem('iceberg_uid');
             if (!savedUid) return false;
             
+            console.log('Попытка автовхода для UID:', savedUid);
+            
+            // 2. Получаем отпечаток устройства
             await getDeviceInfo();
             
             try {
-                // Проверяем, что устройство запомнено
+                // 3. Проверяем, что устройство действительно запомнено в Firestore
                 const isKnown = await isDeviceKnown(savedUid);
-                if (!isKnown) return false;
+                if (!isKnown) {
+                    console.log('Устройство не найдено в списке известных, требуется ручной вход.');
+                    localStorage.removeItem('iceberg_uid');
+                    return false;
+                }
                 
-                // Проверяем блокировку
+                // 4. Проверяем блокировку аккаунта
                 if (await isAccountLocked(savedUid)) {
                     localStorage.removeItem('iceberg_uid');
                     return false;
                 }
                 
-                // Получаем данные пользователя
+                // 5. Получаем роль пользователя
                 const userDoc = await getDoc(doc(db, "users", savedUid));
-                if (!userDoc.exists()) return false;
+                if (!userDoc.exists()) {
+                    localStorage.removeItem('iceberg_uid');
+                    return false;
+                }
                 
                 const userData = userDoc.data();
                 const role = userData.role;
                 
                 if (role !== 'admin' && role !== 'employee') {
+                    localStorage.removeItem('iceberg_uid');
                     return false;
                 }
                 
-                // Обновляем онлайн статус
+                // 6. Обновляем онлайн статус
                 await updateDoc(doc(db, "users", savedUid), {
                     online: true,
-                    lastSeen: Timestamp.now()
+                    lastSeen: Timestamp.now(),
+                    icebergLastLogin: Timestamp.now()
                 }).catch(() => {});
                 
-                // Перенаправляем
+                // 7. Перенаправляем
+                console.log('Автовход успешен!');
                 if (role === 'admin') {
                     window.location.href = 'admin.html';
                 } else {
@@ -386,7 +395,7 @@
                 return true;
                 
             } catch (error) {
-                console.error('Автовход не удался:', error);
+                console.error('Ошибка автовхода:', error);
                 localStorage.removeItem('iceberg_uid');
                 return false;
             }
@@ -443,8 +452,7 @@
                 }
                 
                 // Авторизация через email и пароль
-                const userCred = await signInWithEmailAndPassword(auth, email, password);
-                const user = userCred.user;
+                await signInWithEmailAndPassword(auth, email, password);
                 
                 // Проверяем, новое ли устройство
                 const isKnown = await isDeviceKnown(userId);
@@ -495,10 +503,17 @@
                     }
                     document.getElementById('code1').focus();
                     
+                    // В реальном приложении код отправляется на почту/в приложение
+                    // Для теста выводим в консоль
                     console.log('2FA код (для отладки):', code);
+                    
+                    // Сбрасываем кнопку входа
+                    loginBtn.innerHTML = 'Войти в систему';
+                    loginBtn.disabled = false;
                 }
                 
             } catch (err) {
+                console.error(err);
                 let errorText = '❌ Ошибка входа: ';
                 if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
                     errorText += 'Неверный пароль';
@@ -511,8 +526,10 @@
                 errorDiv.style.display = 'block';
                 
                 const loginBtn = document.querySelector('#loginForm .btn');
-                loginBtn.innerHTML = 'Войти в систему';
-                loginBtn.disabled = false;
+                if (loginBtn) {
+                    loginBtn.innerHTML = 'Войти в систему';
+                    loginBtn.disabled = false;
+                }
             }
         };
 
@@ -531,7 +548,7 @@
             }
             
             if (!pendingUser) {
-                errorDiv.innerHTML = '❌ Ошибка сессии';
+                errorDiv.innerHTML = '❌ Ошибка сессии. Вернитесь на шаг назад.';
                 errorDiv.style.display = 'block';
                 return;
             }
@@ -544,7 +561,11 @@
                     // Запоминаем устройство, если отмечено
                     if (document.getElementById('trustDevice').checked) {
                         await addKnownDevice(pendingUser.uid);
+                        // Сохраняем UID в localStorage только если устройство запомнено
                         localStorage.setItem('iceberg_uid', pendingUser.uid);
+                    } else {
+                        // Если не запомнили, чистим localStorage на всякий случай
+                        localStorage.removeItem('iceberg_uid');
                     }
                     
                     // Обновляем статус
@@ -568,6 +589,7 @@
                     errorDiv.style.display = 'block';
                 }
             } catch (err) {
+                console.error(err);
                 errorDiv.innerHTML = '❌ Ошибка: ' + err.message;
                 errorDiv.style.display = 'block';
             }
@@ -579,6 +601,12 @@
             document.getElementById('globalId').value = '';
             document.getElementById('password').value = '';
             pendingUser = null;
+            // Сбрасываем кнопку входа
+            const loginBtn = document.querySelector('#loginForm .btn');
+            if (loginBtn) {
+                loginBtn.innerHTML = 'Войти в систему';
+                loginBtn.disabled = false;
+            }
         };
 
         window.moveToNext = (input, index) => {
@@ -589,32 +617,34 @@
             input.value = input.value.replace(/[^0-9]/g, '');
         };
 
-        // ==================== ПРОВЕРКА АВТОВХОДА ПРИ ЗАГРУЗКЕ ====================
+        // ==================== ИНИЦИАЛИЗАЦИЯ СТРАНИЦЫ ====================
         
+        // Обработка нажатия Enter в полях ввода
+        document.addEventListener('DOMContentLoaded', () => {
+            // Поля основной формы
+            ['globalId', 'password'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.addEventListener('keypress', (e) => {
+                        if (e.key === 'Enter') login();
+                    });
+                }
+            });
+            
+            // Поля 2FA кода
+            for (let i = 1; i <= 4; i++) {
+                const el = document.getElementById(`code${i}`);
+                if (el) {
+                    el.addEventListener('keypress', (e) => {
+                        if (e.key === 'Enter') verify2FA();
+                    });
+                }
+            }
+        });
+
         // Сначала пробуем автовход
         tryAutoLogin();
         
-        // Если автовход не сработал, показываем форму входа
-        // Форма уже видна по умолчанию
-        
-        // Обработка нажатия Enter
-        ['globalId', 'password'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) {
-                el.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') login();
-                });
-            }
-        });
-        
-        for (let i = 1; i <= 4; i++) {
-            const el = document.getElementById(`code${i}`);
-            if (el) {
-                el.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') verify2FA();
-                });
-            }
-        }
     </script>
 </body>
 </html>
