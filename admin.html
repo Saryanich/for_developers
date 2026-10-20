@@ -287,7 +287,12 @@
                 <input type="number" id="taskReward" placeholder="100">
             </div>
             <div class="form-group">
-                <label>Назначить конкретному сотруднику (опционально)</label>
+                <div class="form-group">
+                <label>Каким уровням доступно задание (1–15)</label>
+                <div id="taskEligibleLevels" style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:10px 0;"><label style="display:flex;gap:6px;align-items:center;font-weight:400;"><input type="checkbox" class="task-level-check" value="1" checked> Уровень 1</label><label style="display:flex;gap:6px;align-items:center;font-weight:400;"><input type="checkbox" class="task-level-check" value="2" checked> Уровень 2</label><label style="display:flex;gap:6px;align-items:center;font-weight:400;"><input type="checkbox" class="task-level-check" value="3" checked> Уровень 3</label><label style="display:flex;gap:6px;align-items:center;font-weight:400;"><input type="checkbox" class="task-level-check" value="4" checked> Уровень 4</label><label style="display:flex;gap:6px;align-items:center;font-weight:400;"><input type="checkbox" class="task-level-check" value="5" checked> Уровень 5</label><label style="display:flex;gap:6px;align-items:center;font-weight:400;"><input type="checkbox" class="task-level-check" value="6" checked> Уровень 6</label><label style="display:flex;gap:6px;align-items:center;font-weight:400;"><input type="checkbox" class="task-level-check" value="7" checked> Уровень 7</label><label style="display:flex;gap:6px;align-items:center;font-weight:400;"><input type="checkbox" class="task-level-check" value="8" checked> Уровень 8</label><label style="display:flex;gap:6px;align-items:center;font-weight:400;"><input type="checkbox" class="task-level-check" value="9" checked> Уровень 9</label><label style="display:flex;gap:6px;align-items:center;font-weight:400;"><input type="checkbox" class="task-level-check" value="10" checked> Уровень 10</label><label style="display:flex;gap:6px;align-items:center;font-weight:400;"><input type="checkbox" class="task-level-check" value="11" checked> Уровень 11</label><label style="display:flex;gap:6px;align-items:center;font-weight:400;"><input type="checkbox" class="task-level-check" value="12" checked> Уровень 12</label><label style="display:flex;gap:6px;align-items:center;font-weight:400;"><input type="checkbox" class="task-level-check" value="13" checked> Уровень 13</label><label style="display:flex;gap:6px;align-items:center;font-weight:400;"><input type="checkbox" class="task-level-check" value="14" checked> Уровень 14</label><label style="display:flex;gap:6px;align-items:center;font-weight:400;"><input type="checkbox" class="task-level-check" value="15" checked> Уровень 15</label></div>
+                <div class="info-text">Отметьте уровни программистов, которым разрешено брать это задание.</div>
+            </div>
+            <label>Назначить конкретному сотруднику (опционально)</label>
                 <select id="taskAssignee"></select>
                 <div class="info-text">Если не выбрано, задание увидят все сотрудники</div>
             </div>
@@ -511,6 +516,7 @@
                             <div>⭐ ${task.reward} баллов</div>
                         </div>
                         <div style="margin-bottom: 12px;">📝 ${task.description}</div>
+                        <div style="font-size:13px;color:#667085;margin-bottom:12px;">🎯 Доступно уровням: ${(Array.isArray(task.eligibleLevels)?task.eligibleLevels:Array.from({length:15},(_,i)=>i+1)).join(', ')}</div>
                         <div style="font-size: 13px; color:#666; margin-bottom: 12px;">👤 Назначено: ${assigneeName}</div>
                         <div class="flex-row">
                             <button class="btn btn-danger" onclick="deleteTask('${task.id}')">🗑 Удалить</button>
@@ -538,29 +544,19 @@
             document.getElementById('taskTitle').value = '';
             document.getElementById('taskDescription').value = '';
             document.getElementById('taskReward').value = '';
+            document.querySelectorAll('.task-level-check').forEach(input => input.checked = true);
             document.getElementById('taskModal').style.display = 'flex';
         };
         
         window.createTask = async () => {
-            const title = document.getElementById('taskTitle').value;
-            const description = document.getElementById('taskDescription').value;
-            const reward = parseInt(document.getElementById('taskReward').value);
+            const title = document.getElementById('taskTitle').value.trim();
+            const description = document.getElementById('taskDescription').value.trim();
+            const reward = parseInt(document.getElementById('taskReward').value, 10);
             const assigneeId = document.getElementById('taskAssignee').value || null;
-            
-            if (!title || !reward) {
-                alert('Заполните название и награду');
-                return;
-            }
-            
-            await addDoc(collection(db, "tasks"), {
-                title: title,
-                description: description,
-                reward: reward,
-                assigneeId: assigneeId,
-                status: "active",
-                createdAt: Timestamp.now()
-            });
-            
+            const eligibleLevels = [...document.querySelectorAll('.task-level-check:checked')].map(input => Number(input.value)).filter(n => n >= 1 && n <= 15);
+            if (!title || !description || !Number.isFinite(reward) || reward < 1) { alert('Заполните название, описание и положительную награду'); return; }
+            if (!eligibleLevels.length) { alert('Выберите хотя бы один уровень программиста'); return; }
+            await addDoc(collection(db, "tasks"), {title, description, reward, assigneeId, eligibleLevels, status:"active", createdAt:Timestamp.now()});
             alert('Задание создано!');
             closeModal('taskModal');
             loadTasks();
@@ -819,23 +815,57 @@
             document.getElementById(id).style.display = 'none';
         };
         
-        const trainingAdminEsc = value => String(value || '').replace(/[&<>\"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[ch]));
+
+        const trainingAdminEsc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
         const trainingAdminDate = value => value && value.toDate ? value.toDate() : (value ? new Date(value) : null);
+        function trainingRecommendation(record) {
+          const days=record?.days||{};
+          const totalAttempts=[1,2,3].reduce((sum,d)=>sum+(Number(days[d]?.attempts)||0),0);
+          const firstTry=[1,2,3].filter(d=>(Number(days[d]?.attempts)||0)===1&&days[d]?.passed).length;
+          const retries=Math.max(0,totalAttempts-[1,2,3].filter(d=>(Number(days[d]?.attempts)||0)>0).length);
+          const final=record?.finalAssignment||{}, finalAttempts=Number(final.attempts)||0;
+          const latest=final.attemptHistory?.[final.attemptHistory.length-1]||{};
+          const score=Number(latest.testScore)||0;
+          const writtenChars=['siteTopic','siteDesign','fullPrompt','codeCriteria'].reduce((n,k)=>n+String(final[k]||'').trim().length,0);
+          const raw=1+Math.round(firstTry/3*5)+Math.round(Math.min(score,10)/10*5)+Math.min(3,Math.round(writtenChars/900));
+          const penalty=Math.min(5,retries+Math.max(0,finalAttempts-1)*2);
+          return {level:Math.max(1,Math.min(15,raw-penalty)),totalAttempts,retries,firstTry,score,finalAttempts,writtenChars};
+        }
         async function loadTrainingStudents() {
           const status=document.getElementById('trainingStudentsStatus'), list=document.getElementById('trainingStudentsList'); status.textContent='Загружаем данные…'; list.textContent='Загрузка…';
           try {
             const res=await Promise.all([getDocs(collection(db,'employee_training')),getDocs(query(collection(db,'users'),where('role','==','employee')))]);
             const byUid=new Map(); res[0].forEach(s=>byUid.set(s.id,s.data())); const employees=[]; res[1].forEach(s=>employees.push({id:s.id,...s.data()}));
             const rows=employees.map(emp=>({emp,record:byUid.get(emp.id)||null})); const completed=rows.filter(x=>x.record&&x.record.status==='completed').length; const started=rows.filter(x=>x.record).length;
-            document.getElementById('trainingStudentsStats').innerHTML='<div class="stat-card"><div class="stat-number">'+employees.length+'</div><div class="stat-label">👥 Сотрудников</div></div><div class="stat-card"><div class="stat-number">'+started+'</div><div class="stat-label">📚 Начали</div></div><div class="stat-card"><div class="stat-number">'+completed+'</div><div class="stat-label">🏆 Завершили</div></div><div class="stat-card"><div class="stat-number">'+(started-completed)+'</div><div class="stat-label">⏳ В процессе</div></div>';
-            list.innerHTML=rows.map(({emp,record})=>{const days=record&&record.days||{};const passed=[1,2,3].filter(d=>days[d]&&days[d].passed).length;const pct=record&&record.status==='completed'?100:Math.round(passed/3*80);const final=record&&record.finalAssignment||{};
-              const lessonHtml=[1,2,3].map(d=>{const x=days[d]||{};const st=trainingAdminDate(x.startedAt),pa=trainingAdminDate(x.passedAt);const mins=st&&pa?Math.round((pa-st)/60000):0;const ans=x.answers||{};return '<div class="request-card"><strong>День '+d+': '+['Промпт','Качество результата','Проверка ИИ'][d-1]+'</strong><div>Статус: '+(x.passed?'✅ Пройден':x.lastPassed===false?'❌ Не сдан':'⏳ Не завершён')+'</div><div>Тест: '+(x.score==null?'—':x.score)+'/4 · Попыток: '+(x.attempts||0)+' · Время: '+(st?(mins||Math.round((Date.now()-st)/60000))+' мин':'—')+'</div><div class="info-text">Ответы: '+(Object.keys(ans).length?Object.entries(ans).map(([q,v])=>'Вопрос '+(Number(q)+1)+': вариант '+(Number(v)+1)).join(' · '):'Пока нет')+'</div></div>';}).join('');
-              const finalHtml=Object.keys(final).length?'<div class="request-card"><h3>📝 Итоговая письменная работа</h3>'+[['На какую тему сайт','siteTopic'],['Как всё должно выглядеть','siteDesign'],['Полный промпт для DeepSeek','fullPrompt'],['Критерии оценки кода','codeCriteria']].map(([label,key])=>'<div style="margin-top:12px"><strong>'+label+'</strong><pre style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;margin-top:5px">'+trainingAdminEsc(final[key]||'—')+'</pre></div>').join('')+'</div>':'<div class="request-card">Итоговая работа ещё не отправлена.</div>';
-              return '<div class="employee-card"><div class="employee-header"><strong>'+trainingAdminEsc(emp.name||emp.email||emp.globalId||emp.id)+'</strong><span>'+passed+'/3 урока · '+pct+'%</span></div><div>Global ID: '+trainingAdminEsc(emp.globalId||'—')+' · '+trainingAdminEsc(emp.email||'')+'</div><div class="training-progress"><span style="width:'+pct+'%"></span></div><div>Статус: '+(record&&record.status==='completed'?'🏆 Завершено':record?'📖 В процессе':'🆕 Ожидает начала')+'</div>'+lessonHtml+finalHtml+'</div>';}).join('');
-            status.textContent='Обновлено: '+new Date().toLocaleTimeString();
+            document.getElementById('trainingStudentsStats').innerHTML='<div class="stat-card"><div class="stat-number">'+employees.length+'</div><div class="stat-label">👥 Сотрудников</div></div><div class="stat-card"><div class="stat-number">'+started+'</div><div class="stat-label">📚 Начали</div></div><div class="stat-card"><div class="stat-number">'+completed+'</div><div class="stat-label">🏆 Утверждён уровень</div></div><div class="stat-card"><div class="stat-number">'+(started-completed)+'</div><div class="stat-label">⏳ В процессе</div></div>';
+            list.innerHTML=rows.map(({emp,record})=>{
+              const days=record?.days||{}, passed=[1,2,3].filter(d=>days[d]?.passed).length, final=record?.finalAssignment||{}, rec=trainingRecommendation(record||{});
+              const lessonHtml=[1,2,3].map(d=>{
+                const x=days[d]||{}, hist=x.attemptHistory||[], latest=x.answers||{};
+                const attemptsHtml=hist.length?hist.map(at=>'<div class="request-card"><strong>Попытка '+at.attempt+': '+at.score+'/'+(at.total||15)+' · '+(at.passed?'Сдан':'Не сдан')+'</strong><div>Дата: '+(trainingAdminDate(at.submittedAt)?.toLocaleString('ru-RU')||'—')+'</div><div>Ответы: '+Object.entries(at.answers||{}).map(([q,v])=>'Вопрос '+(Number(q)+1)+': вариант '+(Number(v)+1)).join(' · ')+'</div><details style="margin-top:8px"><summary>Разбор по каждому вопросу</summary>'+((at.review||[]).map(x=>'<div style="margin:8px 0">'+trainingAdminEsc(x.question)+'<br>Ответ: вариант '+(Number(x.answer)+1)+' · '+(x.isCorrect?'верно':'ошибка')+' · правильный вариант '+(Number(x.correctAnswer)+1)+'</div>').join(''))+'</details></div>').join(''):'<div>Попыток пока нет.</div>';
+                return '<div class="request-card"><strong>Межтематический тест '+d+'</strong><div>Статус: '+(x.passed?'Пройден':x.lastPassed===false?'Не сдан':'Не начат')+' · Попыток: '+(x.attempts||0)+'</div><div>Текущие ответы: '+Object.entries(latest).map(([q,v])=>'Вопрос '+(Number(q)+1)+': вариант '+(Number(v)+1)).join(' · ')+'</div>'+attemptsHtml+'</div>';
+              }).join('');
+              const finalHistory=(final.attemptHistory||[]).map(at=>'<div class="request-card"><strong>Итоговая попытка '+at.attempt+' · '+at.testTotal+' вопросов · '+at.testScore+'/10 (видно только админу)</strong><div>Дата: '+(trainingAdminDate(at.submittedAt)?.toLocaleString('ru-RU')||'—')+'</div><div>Ответы: '+Object.entries(at.testAnswers||{}).map(([q,v])=>'Вопрос '+(Number(q)+1)+': вариант '+(Number(v)+1)).join(' · ')+'</div><details><summary>Проверить правильные ответы</summary>'+Object.entries(at.testAnswers||{}).map(([q,v])=>{const key=[1,0,0,1,0,0,0,0,1,1][Number(q)];return '<div>Вопрос '+(Number(q)+1)+': '+(Number(v)===key?'верно':'ошибка')+' · выбран вариант '+(Number(v)+1)+' · правильный вариант '+(key+1)+'</div>';}).join('')+'</details><h4>Письменная часть этой попытки</h4>'+Object.entries(at.written||{}).map(([k,v])=>'<div><strong>'+trainingAdminEsc(k)+'</strong><pre style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit">'+trainingAdminEsc(v)+'</pre></div>').join('')+'</div>').join('');
+              const finalHtml=Object.keys(final).length?'<div class="request-card"><h3>Итоговая аттестация · '+trainingAdminEsc(final.status||'—')+'</h3><div>Попыток: '+(final.attempts||0)+' · Балл скрыт от сотрудника до решения администратора</div>'+[['На какую тему сайт','siteTopic'],['Как всё должно выглядеть','siteDesign'],['Полный промпт для DeepSeek','fullPrompt'],['Критерии оценки кода','codeCriteria']].map(([label,key])=>'<div style="margin-top:12px"><strong>'+label+'</strong><pre style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;margin-top:5px">'+trainingAdminEsc(final[key]||'—')+'</pre></div>').join('')+'<h4>Ответы последней итоговой попытки</h4><div>'+Object.entries(final.testAnswers||{}).map(([q,v])=>'Вопрос '+(Number(q)+1)+': вариант '+(Number(v)+1)).join(' · ')+'</div>'+finalHistory+'</div>':'<div class="request-card">Итоговая аттестация ещё не отправлена.</div>';
+              const needsReview=record&&record.status==='final_pending';
+              const approveUi=needsReview?'<div class="request-card"><h3>Проверка администратора</h3><p>Алгоритм рекомендует уровень <strong>'+rec.level+'/15</strong>. Основание: повторные попытки '+rec.retries+', итоговый тест '+rec.score+'/10, межтематические тесты с первой попытки '+rec.firstTry+'/3. Рекомендация вспомогательная; окончательный уровень выбирает администратор после проверки всех ответов и письменной работы.</p><label>Утверждаемый уровень программиста (1–15)</label><select id="trainingLevel-'+emp.id+'" style="width:100%;padding:10px;margin:8px 0">'+Array.from({length:15},(_,i)=>'<option value="'+(i+1)+'" '+(i+1===rec.level?'selected':'')+'>'+(i+1)+'</option>').join('')+'</select><label>Комментарий сотруднику (необязательно)</label><textarea id="trainingReview-'+emp.id+'" style="width:100%;min-height:90px;padding:10px;margin:8px 0" placeholder="Комментарий по результатам проверки"></textarea><button class="btn btn-success" onclick="approveTrainingLevel(\''+emp.id+'\',\''+rec.level+'\')">Принять этап и утвердить уровень</button></div>':'';
+              return '<div class="employee-card"><div class="employee-header"><strong>'+trainingAdminEsc(emp.name||emp.email||emp.globalId||emp.id)+'</strong><span>'+passed+'/3 теста пройдено · '+(record?.status==='completed'?'Уровень '+(record.programmerLevel||'—')+'/15':record?.status==='final_pending'?'Ожидает проверки':'В обучении')+'</span></div><div>Global ID: '+trainingAdminEsc(emp.globalId||'—')+' · '+trainingAdminEsc(emp.email||'')+'</div><div class="training-progress"><span style="width:'+(record?.status==='completed'?100:Math.round(passed/3*70))+'%"></span></div>'+lessonHtml+finalHtml+approveUi+'</div>';
+            }).join('');
+            status.textContent='Обновлено: '+new Date().toLocaleTimeString('ru-RU');
           } catch(err) { console.error(err); status.textContent='Ошибка доступа к Firestore'; list.innerHTML='<div class="request-card">Не удалось загрузить учащихся: '+trainingAdminEsc(err.message)+'. Проверьте права чтения users и employee_training.</div>'; }
         }
-
+        window.approveTrainingLevel = async (uid, recommended) => {
+          const level=Number(document.getElementById('trainingLevel-'+uid)?.value), review=(document.getElementById('trainingReview-'+uid)?.value||'').trim();
+          if(!Number.isInteger(level)||level<1||level>15){alert('Выберите уровень от 1 до 15');return;}
+          if(!confirm('Принять этап обучения и утвердить уровень программиста '+level+'/15?'))return;
+          try {
+            await updateDoc(doc(db,'employee_training',uid),{status:'completed',programmerLevel:level,algorithmRecommendedLevel:Number(recommended),adminReview:review,approvedAt:Timestamp.now()});
+            await updateDoc(doc(db,'users',uid),{programmerLevel:level});
+            alert('Обучение принято. Уровень '+level+'/15 назначен.');
+            await loadTrainingStudents();
+          } catch(err) { alert('Не удалось утвердить уровень: '+err.message); }
+        };
+        
         window.switchMainTab = (tab) => {
             currentTab = tab;
             document.querySelectorAll('.main-tab').forEach(t => t.classList.remove('active'));
