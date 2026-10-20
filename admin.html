@@ -160,6 +160,7 @@
                 <button class="main-tab" onclick="switchMainTab('assignments')">✅ Выполнения</button>
                 <button class="main-tab" onclick="switchMainTab('transactions')">📊 Транзакции</button>
                 <button class="main-tab" onclick="switchMainTab('joinRequests')">📝 Заявки</button>
+                <button class="main-tab" onclick="switchMainTab('loans')">🏦 GloBank</button>
             </div>
             
             <div id="employeesSection">
@@ -191,6 +192,8 @@
                 <div class="stats-grid" id="joinRequestsStats"></div>
                 <div id="joinRequestsList">Загрузка...</div>
             </div>
+
+            <div id="loansSection" style="display:none;"><iframe title="Заявки GloBank" src="globank-loans.html" style="display:block;width:100%;height:78vh;min-height:650px;border:0;border-radius:16px;background:#fff;" loading="lazy"></iframe></div>
         </div>
     </div>
 
@@ -750,12 +753,14 @@
             document.getElementById('assignmentsSection').style.display = tab === 'assignments' ? 'block' : 'none';
             document.getElementById('transactionsSection').style.display = tab === 'transactions' ? 'block' : 'none';
             document.getElementById('joinRequestsSection').style.display = tab === 'joinRequests' ? 'block' : 'none';
+            document.getElementById('loansSection').style.display = tab === 'loans' ? 'block' : 'none';
             
             if (tab === 'employees') loadEmployees();
             else if (tab === 'tasks') loadTasks();
             else if (tab === 'assignments') loadAssignments();
             else if (tab === 'transactions') loadTransactions();
             else if (tab === 'joinRequests') loadJoinRequests();
+            else if (tab === 'loans') { /* loan console is isolated in its own authenticated page */ }
         };
         
         window.logout = async () => {
