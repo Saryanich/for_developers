@@ -490,7 +490,9 @@
 
         function renderLessonQuiz(dayNum) {
           if(trainingCardTick)clearInterval(trainingCardTick);if(trainingTick)clearInterval(trainingTick);
-          const lesson=trainingLessons[dayNum-1], qs=trainingIntertopicQuestions;
+          const lesson=trainingLessons[dayNum-1];
+          const order=Array.from({length:trainingIntertopicQuestions.length},(_,i)=>(i+(dayNum-1)*5)%trainingIntertopicQuestions.length);
+          const qs=order.map((idx)=>{const q=trainingIntertopicQuestions[idx],shift=(idx+dayNum)%3;return {...q,a:q.a.map((_,j)=>q.a[(j+shift)%3]),correct:(q.correct-shift+3)%3};});
           const day=trainingRecord?.days?.[dayNum]||{}, savedAnswers=day.answers||{};
           document.getElementById('trainingContent').innerHTML='<div class="training-pulse">МЕЖТЕМНЫЙ ТЕСТ · 15 ВОПРОСОВ</div><h2>'+trainingEsc(lesson.title)+'</h2><p class="training-lead">Ситуационные задачи на логику и диагностику. Нужно не менее 12 правильных ответов из 15. Результат этого теста показывается сразу.</p><form id="trainingQuizForm">'+qs.map((q,i)=>'<div class="training-question"><strong>'+(i+1)+'. '+trainingEsc(q.q)+'</strong>'+q.a.map((answer,j)=>'<label><input type="radio" name="q'+i+'" value="'+j+'" '+(String(savedAnswers[i])===String(j)?'checked':'')+' required><span>'+trainingEsc(answer)+'</span></label>').join('')+'</div>').join('')+'<div class="training-actions"><button type="button" class="training-btn secondary" id="trainingRepeat">Вернуться к конспекту</button><button class="training-btn" type="submit">Отправить ответы</button></div><div id="quizResult" aria-live="polite"></div></form>';
           document.getElementById('trainingRepeat').onclick=()=>renderTrainingStage();
