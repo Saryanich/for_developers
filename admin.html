@@ -301,6 +301,7 @@
         let currentTab = 'employees';
         let currentEmployeeId = null;
         let currentEmployeePoints = 0;
+        const escapeHTML = (value) => String(value ?? '—').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 
         // ========== СОТРУДНИКИ ==========
         async function loadEmployees() {
@@ -705,16 +706,16 @@
                 html += `
                     <div class="request-card">
                         <div class="request-header">
-                            <div><strong>${req.fullname}</strong> <span class="badge ${statusClass}">${statusText}</span></div>
+                            <div><strong>${escapeHTML(req.fullname)}</strong> <span class="badge ${statusClass}">${statusText}</span></div>
                             <div>📅 ${req.createdAt?.toDate().toLocaleString() || '—'}</div>
                         </div>
-                        <div><strong>📱 Телефон:</strong> ${req.phone}</div>
-                        <div><strong>📧 Telegram:</strong> ${req.telegram || '—'}</div>
-                        <div><strong>🎂 Дата рождения:</strong> ${req.birthdate || '—'}</div>
-                        <div><strong>💭 О себе:</strong> ${req.about || '—'}</div>
+                        <div><strong>📱 Телефон:</strong> ${escapeHTML(req.phone)}</div>
+                        <div><strong>📧 Telegram:</strong> ${escapeHTML(req.telegram || '—')}</div>
+                        <div><strong>🎂 Дата рождения:</strong> ${escapeHTML(req.birthdate || '—')}</div>
+                        <div><strong>💭 О себе:</strong> ${escapeHTML(req.about || '—')}</div>
                         <div class="flex-row" style="margin-top: 16px;">
-                            ${req.status === 'pending' ? `<button class="btn btn-success" onclick="markRequestProcessed('${req.id}')">✅ Отметить обработанной</button>` : ''}
-                            <button class="btn btn-danger" onclick="deleteRequest('${req.id}')">🗑 Удалить</button>
+                            ${req.status === 'pending' ? `<button class="btn btn-success" onclick="markRequestProcessed('${escapeHTML(req.id)}')">✅ Отметить обработанной</button>` : ''}
+                            <button class="btn btn-danger" onclick="deleteRequest('${escapeHTML(req.id)}')">🗑 Удалить</button>
                         </div>
                     </div>
                 `;
