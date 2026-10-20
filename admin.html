@@ -472,7 +472,7 @@
             if (!confirm(`${actionText} сотруднику?\nТекущий баланс: ${currentEmployeePoints} → ${newPoints} баллов\nОснование: ${reason}`)) {
                 return;
             }
-            
+             
             const userRef = doc(db, "users", currentEmployeeId);
             await updateDoc(userRef, { points: newPoints });
             
