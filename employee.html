@@ -387,6 +387,36 @@
           {id:'fullPrompt',label:'3. Полный промпт для нейросети DeepSeek',hint:'Полный готовый запрос: контекст, цель, функциональность, технологии, ограничения, этапы и критерии готовности.'},
           {id:'codeCriteria',label:'4. По каким критериям вы оцените готовый код',hint:'Работоспособность, дизайн, адаптивность, безопасность, доступность, ошибки, производительность и тесты.'}
         ];
+
+        const trainingIntertopicQuestions = [
+          {q:'Заказчик просит «сделать как на примере», но срок — сегодня, а пример содержит 8 экранов. Что делать первым?',a:['Скопировать всё максимально быстро','Уточнить обязательные экраны и критерии приёмки, затем согласовать сокращённый объём','Попросить ИИ самостоятельно выбрать важное'],correct:1},
+          {q:'Форма работает, но двойное нажатие создаёт две заявки. Что исправлять?',a:['Только цвет кнопки','Защититься от повторной отправки и проверить сценарий двойного нажатия','Добавить длиннее текст на кнопке'],correct:1},
+          {q:'ИИ переписал весь файл ради одной ошибки и удалил рабочие функции. Как поступить?',a:['Принять версию, потому что код выглядит аккуратнее','Вернуть рабочую версию, локализовать изменение и проверить регрессию','Попросить переписать всё ещё раз без анализа'],correct:1},
+          {q:'Требование «сайт должен быть быстрым» нельзя однозначно проверить. Что добавить?',a:['Измеримый критерий загрузки на заданном устройстве и сети','Слово «максимально» несколько раз','Больше анимаций загрузки'],correct:0},
+          {q:'На компьютере всё работает, на телефоне кнопку закрывает нижняя панель браузера. Что проверить?',a:['Только цвет кнопки','Адаптивную вёрстку, viewport и безопасные отступы мобильного браузера','Только производительность компьютера'],correct:1},
+          {q:'После исправления авторизации перестала работать история чатов. Какой подход правильный?',a:['Проверить только вход — это отдельная функция','Проверить связанные сценарии, состояние и подписки на данные','Удалить историю, чтобы не было ошибки'],correct:1},
+          {q:'ИИ утверждает, что исправил баг, но проверок нет. Что считать доказательством?',a:['Уверенный ответ ИИ','Изменённый код без ошибок на вид','Воспроизводимый тест и проверенный результат без регрессий'],correct:2},
+          {q:'Нужно добавить кнопку, но неизвестно, куда сохраняются данные. Как поступить?',a:['Изучить архитектуру и существующий путь сохранения','Создать случайную коллекцию','Сохранять данные только в переменную страницы'],correct:0},
+          {q:'Требования «не менять дизайн» и «полностью переделать интерфейс» конфликтуют. Что делать?',a:['Игнорировать одно из требований','Уточнить конфликт и определить разрешённый объём изменений','Молча позволить ИИ выбрать'],correct:1},
+          {q:'В консоли нет ошибок, но получатель не видит новые сообщения. Что проверить?',a:['Только CSS','Сетевые запросы, права доступа, подписки и состояние получателя','Переименовать кнопку отправки'],correct:1},
+          {q:'Как понять, что промпт для кода достаточно конкретный?',a:['Он длиннее остальных','Есть контекст, ограничения, ожидаемые файлы и проверяемые критерии готовности','Много слов «профессионально» и «идеально»'],correct:1},
+          {q:'Пользователь не должен видеть чужие данные. Что безопаснее?',a:['Открыть чтение всем, чтобы устранить ошибку','Проверять авторизацию и минимальные права на уровне правил базы','Спрятать данные с помощью CSS'],correct:1},
+          {q:'Изменение решает баг, но ломает старые сохранённые записи. Что упущено?',a:['Совместимость схемы данных или миграция','Подбор шрифта','Название кнопки'],correct:0},
+          {q:'Заказчик просит «исправить всё», а причина ошибки неизвестна. С чего начать?',a:['Переписать проект целиком','Воспроизвести проблему, собрать симптомы и локализовать причину','Удалить предупреждения из консоли'],correct:1},
+          {q:'Какой отчёт после работы наиболее полезен?',a:['«Всё готово, должно работать»','Изменённые файлы, выполненные проверки, ограничения и непроверенные случаи','Только число написанных строк'],correct:1}
+        ];
+        const trainingFinalTestQuestions = [
+          {q:'Новая версия исправляет вход, но ломает выход из аккаунта. Что делать?',a:['Оставить, потому что вход важнее','Восстановить корректный выход и добавить регрессионные тесты обоих сценариев','Скрыть кнопку выхода'],correct:1},
+          {q:'Для задачи не хватает требований, а заказчик недоступен. Как поступить?',a:['Записать допущения, выбрать безопасный минимальный вариант и отметить вопросы для подтверждения','Выдумать требования и выдать за согласованные','Остановить работу без анализа'],correct:0},
+          {q:'Сайт быстрый на мощном ПК, но медленный на старом телефоне. Что делать?',a:['Измерить на целевом устройстве и оптимизировать найденные узкие места','Считать ПК достаточным доказательством','Уменьшить заголовок'],correct:0},
+          {q:'Firestore запрещает доступ. Как избежать опасного «исправления»?',a:['Открыть всю базу для чтения и записи','Проверить путь, пользователя и роль, затем дать минимально необходимые права','Отключить авторизацию'],correct:1},
+          {q:'ИИ изменил 20 файлов, но не перечислил изменения. Что запросить?',a:['Проверяемый diff, причины изменений и результаты тестов','Ещё больше кода без объяснений','Только красивое описание проекта'],correct:0},
+          {q:'Форма показывает успех до ответа сервера. Почему это плохо?',a:['Пользователь может поверить в несостоявшееся сохранение; нужен реальный статус операции','Интерфейс слишком быстрый','Нужно полностью убрать статус'],correct:0},
+          {q:'Как сделать промпт проверяемым?',a:['Добавить критерии приёмки, ограничения и ожидаемые артефакты','Увеличить количество эпитетов','Попросить «сделать идеально»'],correct:0},
+          {q:'После выхода данные прошлого пользователя видны следующему. Что критично?',a:['Очистить пользовательское состояние и отписаться от слушателей при смене сессии','Изменить фон','Сократить заголовок'],correct:0},
+          {q:'Автотесты проходят, но главный сценарий неудобен. Как поступить?',a:['Считать проект завершённым по тестам','Дополнительно проверить пользовательский сценарий и критерии удобства','Удалить автотесты'],correct:1},
+          {q:'Какой отчёт позволяет объективно принять работу?',a:['«Всё супер»','Требования, проверки, результаты, оставшиеся дефекты и ограничения','Количество сообщений с ИИ'],correct:1}
+        ];
         const trainingEsc = value => String(value ?? '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
         const trainingDate = value => value?.toDate ? value.toDate() : (value ? new Date(value) : null);
         async function saveTraining(patch) {
@@ -408,7 +438,7 @@
             const snap=await getDoc(doc(db,'employee_training',currentUserId));
             trainingRecord=snap.exists()?snap.data():{uid:currentUserId,days:{},status:'in_progress',createdAt:Timestamp.now()};
             if (!snap.exists()) await setDoc(doc(db,'employee_training',currentUserId),trainingRecord);
-            if (trainingRecord.status==='completed') { hideTrainingGate(); return; }
+            if (trainingRecord.status==='completed') { showTrainingGate(); renderTrainingDays(3); document.getElementById('trainingContent').innerHTML='<div class="training-pulse">РЕЗУЛЬТАТ АТТЕСТАЦИИ</div><h2>Проверка завершена</h2><div class="training-status">Администратор утвердил ваш уровень программиста: <strong>'+trainingEsc(trainingRecord.programmerLevel||'—')+' / 15</strong>.</div><p class="training-lead">'+trainingEsc(trainingRecord.adminReview||'Решение принято администратором.')+'</p><div class="training-actions"><button class="training-btn" id="closeTrainingResult">Перейти в кабинет</button></div>';document.getElementById('closeTrainingResult').onclick=hideTrainingGate; return; }
             showTrainingGate();
             renderTrainingStage();
           } catch(err) {
@@ -457,18 +487,42 @@
           const updateTimer=()=>{const elapsedNow=Math.max(0,Math.floor((Date.now()-startedMs)/1000));const left=Math.max(0,1800-elapsedNow);const timer=document.getElementById('trainingTimer');const bar=document.getElementById('trainingLessonProgress');const btn=document.getElementById('trainingToQuiz');if(timer)timer.textContent=Math.floor(left/60)+' мин '+(left%60)+' сек';if(bar)bar.style.width=Math.min(100,elapsedNow/1800*100)+'%';if(btn)btn.disabled=left>0;if(left===0&&trainingTick){clearInterval(trainingTick);trainingTick=null;}};
           updateTimer();trainingTick=setInterval(updateTimer,1000);
         }
+
         function renderLessonQuiz(dayNum) {
           if(trainingCardTick)clearInterval(trainingCardTick);if(trainingTick)clearInterval(trainingTick);
-          const lesson=trainingLessons[dayNum-1];const savedAnswers=trainingRecord?.days?.[dayNum]?.answers||{};
-          document.getElementById('trainingContent').innerHTML='<h2>Тест: '+trainingEsc(lesson.title)+'</h2><p class="training-lead">Нужно правильно ответить минимум на 3 вопроса из 4. При неудаче повторите урок и попробуйте снова.</p><form id="trainingQuizForm">'+lesson.questions.map((q,i)=>'<div class="training-question"><strong>'+(i+1)+'. '+trainingEsc(q.q)+'</strong>'+q.a.map((answer,j)=>'<label><input type="radio" name="q'+i+'" value="'+j+'" '+(String(savedAnswers[i])===String(j)?'checked':'')+' required><span>'+trainingEsc(answer)+'</span></label>').join('')+'</div>').join('')+'<div class="training-actions"><button type="button" class="training-btn secondary" id="trainingRepeat">Повторить тему</button><button class="training-btn" type="submit">Проверить ответы</button></div><div id="quizResult" aria-live="polite"></div></form>';
+          const lesson=trainingLessons[dayNum-1], qs=trainingIntertopicQuestions;
+          const day=trainingRecord?.days?.[dayNum]||{}, savedAnswers=day.answers||{};
+          document.getElementById('trainingContent').innerHTML='<div class="training-pulse">МЕЖТЕМНЫЙ ТЕСТ · 15 ВОПРОСОВ</div><h2>'+trainingEsc(lesson.title)+'</h2><p class="training-lead">Ситуационные задачи на логику и диагностику. Нужно не менее 12 правильных ответов из 15. Результат этого теста показывается сразу.</p><form id="trainingQuizForm">'+qs.map((q,i)=>'<div class="training-question"><strong>'+(i+1)+'. '+trainingEsc(q.q)+'</strong>'+q.a.map((answer,j)=>'<label><input type="radio" name="q'+i+'" value="'+j+'" '+(String(savedAnswers[i])===String(j)?'checked':'')+' required><span>'+trainingEsc(answer)+'</span></label>').join('')+'</div>').join('')+'<div class="training-actions"><button type="button" class="training-btn secondary" id="trainingRepeat">Вернуться к конспекту</button><button class="training-btn" type="submit">Отправить ответы</button></div><div id="quizResult" aria-live="polite"></div></form>';
           document.getElementById('trainingRepeat').onclick=()=>renderTrainingStage();
-          document.getElementById('trainingQuizForm').onsubmit=async ev=>{ev.preventDefault();const answers={};lesson.questions.forEach((q,i)=>{answers[i]=Number(new FormData(ev.target).get('q'+i));});const score=lesson.questions.filter((q,i)=>answers[i]===q.correct).length;const passed=score>=3;const days={...(trainingRecord.days||{}),[dayNum]:{...(trainingRecord.days?.[dayNum]||{}),answers,score,attempts:(trainingRecord.days?.[dayNum]?.attempts||0)+1,lastPassed:passed,lastTestAt:Timestamp.now(),passed:passed||(trainingRecord.days?.[dayNum]?.passed===true),...(passed?{passedAt:Timestamp.now()}: {})}};await saveTraining({days,status:passed&&dayNum===3?'final_pending':'in_progress'});document.getElementById('quizResult').innerHTML='<div class="training-status">'+(passed?'✅ Тест сдан: ':'❌ Тест не сдан: ')+score+' из 4.'+(passed?' Следующий урок откроется через 24 часа.':' Нужно повторить тему и пересдать.')+'</div><div class="training-actions"><button type="button" class="training-btn" id="quizContinue">'+(passed?'Продолжить':'Повторить урок')+'</button></div>';document.getElementById('quizContinue').onclick=()=>{if(passed){if(dayNum===3)renderFinalAssignment();else renderTrainingStage();}else renderTrainingStage();};};
+          document.getElementById('trainingQuizForm').onsubmit=async ev=>{
+            ev.preventDefault();const answers={};qs.forEach((q,i)=>answers[i]=Number(new FormData(ev.target).get('q'+i)));
+            const score=qs.filter((q,i)=>answers[i]===q.correct).length, passed=score>=12;
+            const prev=trainingRecord?.days?.[dayNum]||{}, attemptNo=(prev.attempts||0)+1;
+            const attempt={attempt:attemptNo,answers:{...answers},score,total:qs.length,passed,submittedAt:Timestamp.now(),review:qs.map((q,i)=>({question:q.q,answer:answers[i],correctAnswer:q.correct,isCorrect:answers[i]===q.correct}))};
+            const days={...(trainingRecord.days||{}),[dayNum]:{...prev,answers,score,attempts:attemptNo,attemptHistory:[...(prev.attemptHistory||[]),attempt],lastPassed:passed, lastTestAt:Timestamp.now(),passed:passed||(prev.passed===true),...(passed&&!prev.passed?{passedAt:Timestamp.now()}: {})}};
+            await saveTraining({days,status:'in_progress'});
+            document.getElementById('quizResult').innerHTML='<div class="training-status">'+(passed?'✅ Тест сдан: ':'❌ Тест не сдан: ')+score+' из '+qs.length+'. '+(passed?'Следующий урок откроется через 24 часа.':'Нужно набрать минимум 12/15. Повторите тему и попробуйте снова.')+'</div><div class="training-actions"><button type="button" class="training-btn" id="quizContinue">'+(passed?'Продолжить':'Повторить урок')+'</button></div>';
+            document.getElementById('quizContinue').onclick=()=>{if(passed){if(dayNum===3)renderFinalAssignment();else renderTrainingStage();}else renderTrainingStage();};
+          };
         }
         function renderFinalAssignment() {
           renderTrainingDays(3);
           const final=trainingRecord?.finalAssignment||{};
-          document.getElementById('trainingContent').innerHTML='<div class="training-pulse">ФИНАЛЬНАЯ АТТЕСТАЦИЯ</div><h2>Создайте полноценный промпт для сайта</h2><p class="training-lead">Представьте, что вы ставите задачу DeepSeek. Заполните все четыре раздела подробно: итоговый ответ увидит администратор.</p><form id="trainingFinalForm">'+trainingFinalFields.map(f=>'<div class="form-group"><label for="'+f.id+'">'+trainingEsc(f.label)+' *</label><p class="training-note">'+trainingEsc(f.hint)+'</p><textarea class="training-input" style="min-height:'+(f.id==='fullPrompt'?220:120)+'px" id="'+f.id+'" required minlength="'+(f.id==='fullPrompt'?120:20)+'" maxlength="'+(f.id==='fullPrompt'?12000:3000)+'" placeholder="'+trainingEsc(f.hint)+'">'+trainingEsc(final[f.id]||'')+'</textarea></div>').join('')+'<div class="training-actions"><button class="training-btn" type="submit">Отправить финальную работу</button></div><div id="finalStatus" aria-live="polite"></div></form>';
-          document.getElementById('trainingFinalForm').onsubmit=async ev=>{ev.preventDefault();const answers={};trainingFinalFields.forEach(f=>answers[f.id]=document.getElementById(f.id).value.trim());if(trainingFinalFields.some(f=>answers[f.id].length<(f.id==='fullPrompt'?120:20))){document.getElementById('finalStatus').innerHTML='<div class="training-status">Заполните все разделы развёрнуто. Полный промпт должен содержать не менее 120 символов.</div>';return;}const finalAssignment={...answers,submittedAt:Timestamp.now(),status:'submitted'};await saveTraining({finalAssignment,status:'completed',completedAt:Timestamp.now()});document.getElementById('trainingContent').innerHTML='<div class="training-status"><h2>🎉 Обучение завершено!</h2><p>Все три урока пройдены, финальная работа сохранена и отправлена администратору на проверку.</p></div>';renderTrainingDays(3);};
+          if(final.status==='submitted'||trainingRecord?.status==='final_pending'){
+            document.getElementById('trainingContent').innerHTML='<div class="training-pulse">ФИНАЛЬНАЯ АТТЕСТАЦИЯ</div><h2>Работа отправлена на проверку</h2><div class="training-status">Оценка, правильные ответы и уровень скрыты до проверки администратором. Администратор увидит все попытки, ответы и письменную часть.</div>';return;
+          }
+          const finalAnswers=final.testAnswers||{};
+          document.getElementById('trainingContent').innerHTML='<div class="training-pulse">ФИНАЛЬНАЯ АТТЕСТАЦИЯ</div><h2>10 вопросов и письменное задание</h2><p class="training-lead">Ответьте на 10 ситуационных вопросов и выполните письменную работу. Результат будет скрыт до проверки администратором.</p><form id="trainingFinalForm"><h3 style="margin:18px 0 8px">Часть 1. Ситуационный тест</h3>'+trainingFinalTestQuestions.map((q,i)=>'<div class="training-question"><strong>'+(i+1)+'. '+trainingEsc(q.q)+'</strong>'+q.a.map((answer,j)=>'<label><input type="radio" name="finalq'+i+'" value="'+j+'" '+(String(finalAnswers[i])===String(j)?'checked':'')+' required><span>'+trainingEsc(answer)+'</span></label>').join('')+'</div>').join('')+'<h3 style="margin:24px 0 8px">Часть 2. Письменное задание</h3><p class="training-note">Составьте подробное техническое задание на сайт и объясните, как проверить результат. Учитывайте спорные случаи, ограничения, ошибки и критерии приёмки.</p>'+trainingFinalFields.map(f=>'<div class="form-group"><label for="'+f.id+'">'+trainingEsc(f.label)+' *</label><p class="training-note">'+trainingEsc(f.hint)+'</p><textarea class="training-input" style="min-height:'+(f.id==='fullPrompt'?220:120)+'px" id="'+f.id+'" required minlength="'+(f.id==='fullPrompt'?120:20)+'" maxlength="'+(f.id==='fullPrompt'?12000:3000)+'" placeholder="'+trainingEsc(f.hint)+'">'+trainingEsc(final[f.id]||'')+'</textarea></div>').join('')+'<div class="training-actions"><button class="training-btn" type="submit">Отправить итоговую аттестацию</button></div><div id="finalStatus" aria-live="polite"></div></form>';
+          document.getElementById('trainingFinalForm').onsubmit=async ev=>{
+            ev.preventDefault();const testAnswers={};trainingFinalTestQuestions.forEach((q,i)=>testAnswers[i]=Number(new FormData(ev.target).get('finalq'+i)));
+            const written={};trainingFinalFields.forEach(f=>written[f.id]=document.getElementById(f.id).value.trim());
+            if(trainingFinalFields.some(f=>written[f.id].length<(f.id==='fullPrompt'?120:20))){document.getElementById('finalStatus').innerHTML='<div class="training-status">Заполните все разделы развёрнуто. Полный промпт должен содержать не менее 120 символов.</div>';return;}
+            const prev=trainingRecord?.finalAssignment||{}, attemptNo=(prev.attempts||0)+1, score=trainingFinalTestQuestions.filter((q,i)=>testAnswers[i]===q.correct).length;
+            const attempt={attempt:attemptNo,testAnswers:{...testAnswers},testScore:score,testTotal:10,written:{...written},submittedAt:Timestamp.now()};
+            const finalAssignment={...written,testAnswers,attempts:attemptNo,attemptHistory:[...(prev.attemptHistory||[]),attempt],submittedAt:Timestamp.now(),status:'submitted'};
+            await saveTraining({finalAssignment,status:'final_pending',finalSubmittedAt:Timestamp.now()});
+            document.getElementById('trainingContent').innerHTML='<div class="training-status"><h2>Аттестация отправлена на проверку</h2><p>Результат теста скрыт. Администратор проверит ответы, историю попыток и письменную часть, затем утвердит уровень от 1 до 15.</p></div>';renderTrainingDays(3);
+          };
         }
         async function loadUserData() {
             if (!currentUserId) return;
@@ -488,7 +542,10 @@
                 const task = { id: docSnap.id, ...docSnap.data() };
                 const existing = await getDocs(query(collection(db, "task_assignments"), 
                     where("taskId", "==", task.id), where("userId", "==", currentUserId)));
-                if (existing.empty && (!task.assigneeId || task.assigneeId === currentUserId)) {
+                const userSnapForLevel=await getDoc(doc(db,'users',currentUserId));
+                const userLevel=Number(userSnapForLevel.data()?.programmerLevel||0);
+                const eligible=Array.isArray(task.eligibleLevels)?task.eligibleLevels.map(Number):Array.from({length:15},(_,i)=>i+1);
+                if (existing.empty && (!task.assigneeId || task.assigneeId === currentUserId) && (!userLevel || eligible.includes(userLevel))) {
                     tasks.push(task);
                 }
             }
