@@ -160,7 +160,7 @@
                 <button class="main-tab" onclick="switchMainTab('assignments')">✅ Выполнения</button>
                 <button class="main-tab" onclick="switchMainTab('transactions')">📊 Транзакции</button>
                 <button class="main-tab" onclick="switchMainTab('joinRequests')">📝 Заявки</button>
-                <button class="main-tab" onclick="switchMainTab('loans')">🏦 GloBank</button>
+                <button class="main-tab" onclick="switchMainTab('orders')">📦 Заказы IT Global</button>
             </div>
             
             <div id="employeesSection">
@@ -193,7 +193,19 @@
                 <div id="joinRequestsList">Загрузка...</div>
             </div>
 
-            <div id="loansSection" style="display:none;"><iframe title="Заявки GloBank" src="globank-loans.html" style="display:block;width:100%;height:78vh;min-height:650px;border:0;border-radius:16px;background:#fff;" loading="lazy"></iframe></div>
+            <div id="ordersSection" style="display:none;">
+                <div class="flex-row" style="margin-bottom:16px;align-items:center;">
+                    <button class="btn btn-primary" onclick="loadOrders()">↻ Обновить</button>
+                    <span class="info-text" id="ordersStatus" role="status" aria-live="polite"></span>
+                </div>
+                <div class="stats-grid" id="ordersStats"></div>
+                <div class="main-tabs" style="margin:16px 0;">
+                    <button class="main-tab active" onclick="loadOrders('new')">🆕 Новые</button>
+                    <button class="main-tab" onclick="loadOrders('read')">📖 Прочитанные</button>
+                    <button class="main-tab" onclick="loadOrders('all')">📋 Все</button>
+                </div>
+                <div id="ordersList">Загрузка заказов…</div>
+            </div>
         </div>
     </div>
 
@@ -299,6 +311,8 @@
         const db = getFirestore();
         
         let currentTab = 'employees';
+        let currentOrdersFilter = 'new';
+        let ordersBusy = false;
         let currentEmployeeId = null;
         let currentEmployeePoints = 0;
         const escapeHTML = (value) => String(value ?? '—').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -739,6 +753,57 @@
             }
         };
         
+
+        // ========== ЗАКАЗЫ IT GLOBAL ==========
+        window.loadOrders = async (filter = currentOrdersFilter) => {
+            if (ordersBusy) return;
+            currentOrdersFilter = filter;
+            ordersBusy = true;
+            const list = document.getElementById('ordersList');
+            const status = document.getElementById('ordersStatus');
+            list.textContent = 'Загрузка заказов…';
+            try {
+                const snap = await getDocs(query(collection(db, 'site_orders'), orderBy('createdAt', 'desc')));
+                const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                document.getElementById('ordersStats').innerHTML = [
+                    ['Новые', orders.filter(o => !o.read).length],
+                    ['Прочитанные', orders.filter(o => !!o.read).length],
+                    ['Всего', orders.length]
+                ].map(([label, count]) => '<div class="stat-card"><div class="stat-value">' + count + '</div><div class="stat-label">' + label + '</div></div>').join('');
+                const shown = filter === 'new' ? orders.filter(o => !o.read) : filter === 'read' ? orders.filter(o => !!o.read) : orders;
+                if (!shown.length) { list.innerHTML = '<div class="empty-state">Заказов в этой категории нет.</div>'; return; }
+                list.innerHTML = shown.map(o => {
+                    const val = (v) => escapeHTML(v ?? '—');
+                    const date = o.createdAt?.toDate ? o.createdAt.toDate().toLocaleString('ru-RU') : '—';
+                    return '<div class="request-card"><div class="request-header"><div><strong>' + val(o.productName || 'Не указан') + '</strong> <span class="badge ' + (o.read ? 'badge-completed' : 'badge-new') + '">' + (o.read ? 'Прочитан' : 'Новый') + '</span></div><div>📅 ' + val(date) + '</div></div>' +
+                    '<div><strong>Global ID:</strong> ' + val(o.globalId) + '</div><div><strong>ФИО:</strong> ' + val(o.fullName) + '</div><div><strong>Телефон:</strong> ' + val(o.phoneNumber) + '</div><div><strong>СНИЛС:</strong> ' + val(o.snils) + '</div><div><strong>Сообщение:</strong> ' + val(o.message) + '</div>' +
+                    '<div class="flex-row" style="margin-top:16px;">' + (!o.read ? '<button class="btn btn-success" data-order-action="read" data-order-id="' + val(o.id) + '">Отметить прочитанным</button>' : '') +
+                    '<button class="btn btn-danger" data-order-action="delete" data-order-id="' + val(o.id) + '">Удалить заказ</button></div></div>';
+                }).join('');
+                status.textContent = 'Загружено: ' + shown.length;
+            } catch (error) {
+                console.error('Orders loading failed', error);
+                list.innerHTML = '<div class="request-card text-danger">Не удалось загрузить заказы. Проверьте правила Firestore: ' + escapeHTML(error.message) + '</div>';
+                status.textContent = 'Ошибка загрузки';
+            } finally { ordersBusy = false; }
+        };
+        document.getElementById('ordersList').addEventListener('click', async (event) => {
+            const button = event.target.closest('[data-order-action]');
+            if (!button || ordersBusy) return;
+            const id = button.dataset.orderId;
+            if (!id) return;
+            if (button.dataset.orderAction === 'delete' && !confirm('Удалить этот заказ?')) return;
+            ordersBusy = true; button.disabled = true;
+            try {
+                if (button.dataset.orderAction === 'read') await updateDoc(doc(db, 'site_orders', id), { read: true });
+                else if (button.dataset.orderAction === 'delete') await deleteDoc(doc(db, 'site_orders', id));
+                await loadOrders(currentOrdersFilter);
+            } catch (error) {
+                alert('Не удалось выполнить действие: ' + error.message);
+                button.disabled = false;
+            } finally { ordersBusy = false; }
+        });
+
         // ========== ОБЩИЕ ФУНКЦИИ ==========
         window.closeModal = (id) => {
             document.getElementById(id).style.display = 'none';
@@ -754,14 +819,14 @@
             document.getElementById('assignmentsSection').style.display = tab === 'assignments' ? 'block' : 'none';
             document.getElementById('transactionsSection').style.display = tab === 'transactions' ? 'block' : 'none';
             document.getElementById('joinRequestsSection').style.display = tab === 'joinRequests' ? 'block' : 'none';
-            document.getElementById('loansSection').style.display = tab === 'loans' ? 'block' : 'none';
+            document.getElementById('ordersSection').style.display = tab === 'orders' ? 'block' : 'none';
             
             if (tab === 'employees') loadEmployees();
             else if (tab === 'tasks') loadTasks();
             else if (tab === 'assignments') loadAssignments();
             else if (tab === 'transactions') loadTransactions();
             else if (tab === 'joinRequests') loadJoinRequests();
-            else if (tab === 'loans') { /* loan console is isolated in its own authenticated page */ }
+            else if (tab === 'orders') loadOrders(currentOrdersFilter);
         };
         
         window.logout = async () => {
