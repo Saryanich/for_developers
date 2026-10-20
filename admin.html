@@ -161,6 +161,7 @@
                 <button class="main-tab" onclick="switchMainTab('transactions')">📊 Транзакции</button>
                 <button class="main-tab" onclick="switchMainTab('joinRequests')">📝 Заявки</button>
                 <button class="main-tab" onclick="switchMainTab('orders')">📦 Заказы IT Global</button>
+                <button class="main-tab" onclick="switchMainTab('trainingStudents')">🎓 Учащиеся сотрудники</button>
             </div>
             
             <div id="employeesSection">
@@ -191,6 +192,11 @@
             <div id="joinRequestsSection" style="display: none;">
                 <div class="stats-grid" id="joinRequestsStats"></div>
                 <div id="joinRequestsList">Загрузка...</div>
+            </div>
+
+            <div id="trainingStudentsSection" style="display:none;">
+                <div class="flex-row" style="margin-bottom:16px;align-items:center;"><button class="btn btn-primary" onclick="loadTrainingStudents()">↻ Обновить прогресс</button><span class="info-text" id="trainingStudentsStatus" role="status" aria-live="polite"></span></div>
+                <div class="stats-grid" id="trainingStudentsStats"></div><div id="trainingStudentsList">Загрузка...</div>
             </div>
 
             <div id="ordersSection" style="display:none;">
@@ -401,7 +407,9 @@
                 
                 await updateDoc(doc(db, "users", userId), {
                     role: "employee",
-                    points: userData.points || 0
+                    points: userData.points || 0,
+                    trainingRequired: true,
+                    employeeJoinedAt: Timestamp.now()
                 });
                 
                 alert(`Сотрудник ${userData.email || globalId} успешно добавлен!`);
@@ -811,6 +819,23 @@
             document.getElementById(id).style.display = 'none';
         };
         
+        const trainingAdminEsc = value => String(value || '').replace(/[&<>\"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[ch]));
+        const trainingAdminDate = value => value && value.toDate ? value.toDate() : (value ? new Date(value) : null);
+        async function loadTrainingStudents() {
+          const status=document.getElementById('trainingStudentsStatus'), list=document.getElementById('trainingStudentsList'); status.textContent='Загружаем данные…'; list.textContent='Загрузка…';
+          try {
+            const res=await Promise.all([getDocs(collection(db,'employee_training')),getDocs(query(collection(db,'users'),where('role','==','employee')))]);
+            const byUid=new Map(); res[0].forEach(s=>byUid.set(s.id,s.data())); const employees=[]; res[1].forEach(s=>employees.push({id:s.id,...s.data()}));
+            const rows=employees.map(emp=>({emp,record:byUid.get(emp.id)||null})); const completed=rows.filter(x=>x.record&&x.record.status==='completed').length; const started=rows.filter(x=>x.record).length;
+            document.getElementById('trainingStudentsStats').innerHTML='<div class="stat-card"><div class="stat-number">'+employees.length+'</div><div class="stat-label">👥 Сотрудников</div></div><div class="stat-card"><div class="stat-number">'+started+'</div><div class="stat-label">📚 Начали</div></div><div class="stat-card"><div class="stat-number">'+completed+'</div><div class="stat-label">🏆 Завершили</div></div><div class="stat-card"><div class="stat-number">'+(started-completed)+'</div><div class="stat-label">⏳ В процессе</div></div>';
+            list.innerHTML=rows.map(({emp,record})=>{const days=record&&record.days||{};const passed=[1,2,3].filter(d=>days[d]&&days[d].passed).length;const pct=record&&record.status==='completed'?100:Math.round(passed/3*80);const final=record&&record.finalAssignment||{};
+              const lessonHtml=[1,2,3].map(d=>{const x=days[d]||{};const st=trainingAdminDate(x.startedAt),pa=trainingAdminDate(x.passedAt);const mins=st&&pa?Math.round((pa-st)/60000):0;const ans=x.answers||{};return '<div class="request-card"><strong>День '+d+': '+['Промпт','Качество результата','Проверка ИИ'][d-1]+'</strong><div>Статус: '+(x.passed?'✅ Пройден':x.lastPassed===false?'❌ Не сдан':'⏳ Не завершён')+'</div><div>Тест: '+(x.score==null?'—':x.score)+'/4 · Попыток: '+(x.attempts||0)+' · Время: '+(st?(mins||Math.round((Date.now()-st)/60000))+' мин':'—')+'</div><div class="info-text">Ответы: '+(Object.keys(ans).length?Object.entries(ans).map(([q,v])=>'Вопрос '+(Number(q)+1)+': вариант '+(Number(v)+1)).join(' · '):'Пока нет')+'</div></div>';}).join('');
+              const finalHtml=Object.keys(final).length?'<div class="request-card"><h3>📝 Итоговая письменная работа</h3>'+[['На какую тему сайт','siteTopic'],['Как всё должно выглядеть','siteDesign'],['Полный промпт для DeepSeek','fullPrompt'],['Критерии оценки кода','codeCriteria']].map(([label,key])=>'<div style="margin-top:12px"><strong>'+label+'</strong><pre style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;margin-top:5px">'+trainingAdminEsc(final[key]||'—')+'</pre></div>').join('')+'</div>':'<div class="request-card">Итоговая работа ещё не отправлена.</div>';
+              return '<div class="employee-card"><div class="employee-header"><strong>'+trainingAdminEsc(emp.name||emp.email||emp.globalId||emp.id)+'</strong><span>'+passed+'/3 урока · '+pct+'%</span></div><div>Global ID: '+trainingAdminEsc(emp.globalId||'—')+' · '+trainingAdminEsc(emp.email||'')+'</div><div class="training-progress"><span style="width:'+pct+'%"></span></div><div>Статус: '+(record&&record.status==='completed'?'🏆 Завершено':record?'📖 В процессе':'🆕 Ожидает начала')+'</div>'+lessonHtml+finalHtml+'</div>';}).join('');
+            status.textContent='Обновлено: '+new Date().toLocaleTimeString();
+          } catch(err) { console.error(err); status.textContent='Ошибка доступа к Firestore'; list.innerHTML='<div class="request-card">Не удалось загрузить учащихся: '+trainingAdminEsc(err.message)+'. Проверьте права чтения users и employee_training.</div>'; }
+        }
+
         window.switchMainTab = (tab) => {
             currentTab = tab;
             document.querySelectorAll('.main-tab').forEach(t => t.classList.remove('active'));
@@ -822,6 +847,7 @@
             document.getElementById('transactionsSection').style.display = tab === 'transactions' ? 'block' : 'none';
             document.getElementById('joinRequestsSection').style.display = tab === 'joinRequests' ? 'block' : 'none';
             document.getElementById('ordersSection').style.display = tab === 'orders' ? 'block' : 'none';
+            document.getElementById('trainingStudentsSection').style.display = tab === 'trainingStudents' ? 'block' : 'none';
             
             if (tab === 'employees') loadEmployees();
             else if (tab === 'tasks') loadTasks();
@@ -829,6 +855,7 @@
             else if (tab === 'transactions') loadTransactions();
             else if (tab === 'joinRequests') loadJoinRequests();
             else if (tab === 'orders') loadOrders(currentOrdersFilter);
+            else if (tab === 'trainingStudents') loadTrainingStudents();
         };
         
         window.logout = async () => {
