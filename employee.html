@@ -154,6 +154,27 @@
         @keyframes trainingPulse{50%{opacity:.3;transform:scale(.75)}}
         @media(max-width:620px){.training-gate{padding:12px}.training-days{grid-template-columns:1fr}.training-day{padding:10px}.training-card{min-height:240px}}
         @media(prefers-reduced-motion:reduce){.training-card,.training-pulse:before{animation:none}}
+
+        /* Refined employee portal */
+        body{background:radial-gradient(circle at 12% 0%,#dcecff 0,#f4f7fc 34%,#edf2f8 100%);color:#17243b}
+        .container{max-width:1260px}
+        .container>.card{border:1px solid rgba(255,255,255,.85);box-shadow:0 18px 55px rgba(31,55,90,.10);background:rgba(255,255,255,.92);backdrop-filter:blur(14px)}
+        .logo-title{font-weight:800;letter-spacing:-.7px;color:#152d51}
+        .employee-badge{display:inline-block;margin-left:8px;background:linear-gradient(120deg,#0d9488,#34d399);box-shadow:0 5px 16px #10b98130;font-weight:700}
+        .points-card{position:relative;overflow:hidden;background:linear-gradient(120deg,#102b56,#1558a6 60%,#13a89e);box-shadow:0 18px 40px #0f4c8b25;text-align:left;padding:26px 30px}
+        .points-card:after{content:"";position:absolute;width:220px;height:220px;border-radius:50%;right:-50px;top:-110px;border:1px solid #ffffff30;box-shadow:0 0 0 24px #ffffff08,0 0 0 48px #ffffff08}
+        .points-value{font-size:clamp(38px,5vw,54px);line-height:1.1;margin-top:8px}
+        .tabs{border:0;background:#eef3fa;padding:6px;border-radius:18px;gap:6px}
+        .tab{flex:1;min-width:150px;border-radius:13px;padding:12px 16px;color:#5b6d85;transition:background .2s,color .2s,box-shadow .2s}
+        .tab.active{background:white;color:#1356a7;box-shadow:0 4px 14px #1c355414}
+        .task-card,.assignment-card{background:linear-gradient(145deg,#fff,#f8fbff);border:1px solid #e0e9f5;box-shadow:0 8px 24px #193c6410;transition:transform .2s,box-shadow .2s}
+        .task-card:hover,.assignment-card:hover{transform:translateY(-2px);box-shadow:0 14px 30px #193c6418}
+        .task-header,.assignment-header{border-color:#e5edf7}
+        .btn{box-shadow:0 4px 12px #1b365510}
+        .btn-primary{background:linear-gradient(120deg,#1769e0,#2789ff)}
+        .btn-success{background:linear-gradient(120deg,#059669,#34c759)}
+        .footer{color:#8090a5}
+        @media(max-width:768px){body{padding:10px}.card{padding:18px 14px}.points-card{padding:22px}.tabs{flex-direction:column}.tab{width:100%}}
     </style>
 </head>
 <body>
