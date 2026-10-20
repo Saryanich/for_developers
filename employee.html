@@ -545,7 +545,8 @@
                 const userSnapForLevel=await getDoc(doc(db,'users',currentUserId));
                 const userLevel=Number(userSnapForLevel.data()?.programmerLevel||0);
                 const eligible=Array.isArray(task.eligibleLevels)?task.eligibleLevels.map(Number):Array.from({length:15},(_,i)=>i+1);
-                if (existing.empty && (!task.assigneeId || task.assigneeId === currentUserId) && (!userLevel || eligible.includes(userLevel))) {
+                const levelAllowed=userLevel?eligible.includes(userLevel):!Array.isArray(task.eligibleLevels);
+                if (existing.empty && (!task.assigneeId || task.assigneeId === currentUserId) && levelAllowed) {
                     tasks.push(task);
                 }
             }
