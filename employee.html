@@ -120,9 +120,51 @@
         @media (max-width: 768px) {
             .header { flex-direction: column; text-align: center; }
         }
+    
+        /* Обучение новых сотрудников */
+        .training-gate{position:fixed;inset:0;z-index:2000;display:none;overflow:auto;background:radial-gradient(circle at 10% 10%,#153e75,#071225 55%,#030712);color:#edf6ff;padding:22px}
+        .training-shell{max-width:960px;margin:0 auto}
+        .training-top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin:0 auto 20px}
+        .training-brand{font-size:13px;letter-spacing:2px;color:#77e8ff;text-transform:uppercase}
+        .training-title{font-size:clamp(28px,5vw,44px);line-height:1.12;margin:10px 0}
+        .training-lead{color:#b8cce8;max-width:720px}
+        .training-panel{background:rgba(13,27,51,.9);border:1px solid #24466f;border-radius:24px;padding:clamp(18px,4vw,32px);box-shadow:0 20px 70px #0005;margin:18px 0}
+        .training-days{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:20px 0}
+        .training-day{border:1px solid #315276;border-radius:16px;padding:14px;background:#0b1a31;color:#c9d9ee}
+        .training-day.active{border-color:#46e5bd;background:#103b43}
+        .training-day.done{border-color:#3abf91}
+        .training-card{min-height:200px;border:1px solid #315276;border-radius:20px;padding:24px;background:linear-gradient(145deg,#122b4c,#0a162b);animation:trainingCardIn .45s ease both}
+        .training-card h3{font-size:clamp(21px,3vw,28px);margin-bottom:12px;color:#82f3d1}
+        .training-card p{color:#d6e5f7;line-height:1.7;font-size:16px}
+        .training-pulse{display:inline-flex;align-items:center;gap:8px;color:#80edff;font-size:13px;margin-bottom:14px}
+        .training-pulse:before{content:"";width:8px;height:8px;border-radius:50%;background:#45e5bd;box-shadow:0 0 16px #45e5bd;animation:trainingPulse 1.2s infinite}
+        .training-progress{height:8px;background:#203751;border-radius:20px;overflow:hidden;margin:14px 0}
+        .training-progress span{display:block;height:100%;background:linear-gradient(90deg,#3b82f6,#3ce8bd);width:0;transition:width .4s}
+        .training-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+        .training-btn{border:0;border-radius:13px;padding:12px 18px;font-weight:700;cursor:pointer;background:linear-gradient(100deg,#3b82f6,#16c9b5);color:#04111f}
+        .training-btn:disabled{opacity:.4;cursor:not-allowed}
+        .training-btn.secondary{background:#1b3554;color:#e6f2ff;border:1px solid #3b5879}
+        .training-question{border:1px solid #284766;border-radius:15px;padding:16px;margin:12px 0;background:#0a192e}
+        .training-question label{display:flex;gap:10px;align-items:flex-start;padding:9px 0;cursor:pointer;color:#d7e5f8}
+        .training-question input{margin-top:4px;accent-color:#45e5bd}
+        .training-input{width:100%;padding:13px;border:1px solid #365879;border-radius:12px;background:#08162a;color:white;margin-top:7px;font:inherit}
+        .training-note{color:#9db6d3;font-size:13px;line-height:1.6}
+        .training-status{padding:14px;border-radius:13px;margin:12px 0;background:#102b3c;color:#c9f9e7}
+        @keyframes trainingCardIn{from{opacity:0;transform:translateY(14px) scale(.99)}to{opacity:1;transform:translateY(0) scale(1)}}
+        @keyframes trainingPulse{50%{opacity:.3;transform:scale(.75)}}
+        @media(max-width:620px){.training-gate{padding:12px}.training-days{grid-template-columns:1fr}.training-day{padding:10px}.training-card{min-height:240px}}
+        @media(prefers-reduced-motion:reduce){.training-card,.training-pulse:before{animation:none}}
     </style>
 </head>
 <body>
+    <div id="trainingGate" class="training-gate" role="dialog" aria-modal="true" aria-labelledby="trainingTitle">
+        <div class="training-shell">
+            <div class="training-top"><div><div class="training-brand">IT GLOBAL · ACADEMY</div><h1 class="training-title" id="trainingTitle">Пройдите обучение и тестирование</h1><p class="training-lead">Три дня практики, чтобы создавать сильные запросы к ИИ, оценивать качество результата и отвечать за готовый продукт.</p></div></div>
+            <div class="training-days" id="trainingDays"></div>
+            <div class="training-panel" id="trainingContent"><p>Загрузка обучения…</p></div>
+            <p class="training-note">Прогресс сохраняется в аккаунте. Следующий урок открывается не раньше следующего дня. При неудачном тесте нужно повторить тему и пересдать.</p>
+        </div>
+    </div>
     <div class="container">
         <div class="card">
             <div class="header">
@@ -178,7 +220,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, doc, getDoc, getDocs, updateDoc, addDoc, collection, query, where, orderBy, Timestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, getDocs, updateDoc, addDoc, setDoc, collection, query, where, orderBy, Timestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyA6GGJxAiao77U7_9mBUEjftmS_FnSWbIw",
@@ -197,7 +239,136 @@
         let currentUserGlobalId = null;
         let currentTab = 'available';
         let countdownIntervals = {};
+        let trainingRecord = null;
+        let trainingTick = null;
+        let trainingCardTick = null;
+        let trainingCardIndex = 0;
+        let trainingAnswers = {};
         
+        const trainingLessons = [
+          {title:'День 1. Промпт, который понимает задачу',subtitle:'Формулируем запрос так, чтобы ИИ знал цель, контекст и результат',cards:[
+            ['Не проси «сделай красиво»','Назови цель, аудиторию и проблему. Например: «Создай лендинг для школьного IT-клуба, чтобы посетители записывались на занятия».'],
+            ['Дай контекст','Объясни, для кого работа, где она будет использоваться, что уже существует и какие ограничения нельзя нарушать.'],
+            ['Опиши результат','Укажи формат ответа: готовые файлы, структура проекта, инструкция запуска, адаптивность, поддерживаемые устройства.'],
+            ['Задай ограничения','Назови стек, сроки, запреты и совместимость. Не требуй одновременно несовместимых вещей.'],
+            ['Разбей большую задачу','Сначала архитектура, затем компоненты, затем реализация и проверка. Попроси сообщить о предположениях и рисках.'],
+            ['Проверь, понял ли ИИ задачу','Попроси сначала кратко перечислить требования и критерии готовности, а потом выполнять работу.']
+          ],questions:[
+            {q:'Что лучше всего задаёт цель промпта?',a:['«Сделай что-нибудь классное»','«Создай сайт записи на кружок для родителей; главная цель — заявка на пробное занятие»','«Напиши много кода»'],correct:1},
+            {q:'Что полезно добавить к задаче?',a:['Контекст, аудиторию, ограничения и ожидаемый результат','Только слово «срочно»','Ничего, ИИ сам догадается'],correct:0},
+            {q:'Как надёжнее поручить большой проект?',a:['Попросить всё одним предложением и не проверять','Дать этапы, критерии готовности и порядок проверки','Попросить сделать как у всех'],correct:1},
+            {q:'Что сделать, если запрос неоднозначен?',a:['Попросить ИИ уточнить вопросы или перечислить предположения','Считать любой ответ правильным','Убрать все ограничения'],correct:0}
+          ]},
+          {title:'День 2. Не «и так сойдёт»: качество и вкус',subtitle:'Учимся задавать измеримые требования и улучшать результат итерациями',cards:[
+            ['Красиво — это не критерий','Опиши визуальный язык: сетка, отступы, типографика, контраст, иерархия, состояния кнопок и единый стиль.'],
+            ['Укажи, что значит «готово»','Например: нет горизонтальной прокрутки на телефоне, все кнопки работают, формы показывают ошибки, загрузка и пустые состояния оформлены.'],
+            ['Требуй цельность','Цвета, радиусы, размеры и компоненты должны повторяться системно. Не смешивай случайные стили и несвязанные элементы.'],
+            ['Проверяй реальное поведение','Проси пройти сценарии пользователя, проверить консоль, сетевые ошибки, формы, навигацию и мобильную ширину.'],
+            ['Итерируй по проблемам','Сначала перечисли конкретные недостатки, затем исправь их. Не переписывай всё без причины и не ломай уже работающие функции.'],
+            ['Сравнивай с критериями','Оцени каждый пункт: выполнен, частично или нет. Требуй доказательство проверки, а не фразу «всё работает».']
+          ],questions:[
+            {q:'Как превратить «сделай красиво» в полезное требование?',a:['«Добавь побольше эффектов»','Указать визуальную систему, отступы, адаптивность и состояния интерфейса','Попросить ИИ самому решить всё'],correct:1},
+            {q:'Что делать после первого результата?',a:['Сразу публиковать без проверки','Проверить по критериям, найти конкретные дефекты и исправлять итерациями','Удалить все функции'],correct:1},
+            {q:'Как проверить кнопку?',a:['Убедиться, что она выглядит красиво','Нажать её и проверить ожидаемое действие, ошибки и обратную связь','Посмотреть только цвет'],correct:1},
+            {q:'Как правильно просить исправить код?',a:['Назвать воспроизводимую проблему и ожидаемое поведение','«Всё плохо, переделай»','Не указывать, что уже работает'],correct:0}
+          ]},
+          {title:'День 3. Что требовать от ИИ и как проверять',subtitle:'Ответственность за качество, безопасность и конечный результат',cards:[
+            ['Требуй полный результат','Укажи файлы, зависимости, структуру, инструкции запуска и что именно изменено. Не принимай заглушки вместо функций.'],
+            ['Требуй работающие сценарии','Перечисли сценарии пользователя и попроси проверить каждый: успех, ошибка, пустые данные, медленная сеть и повторное действие.'],
+            ['Безопасность — обязательна','Не размещай секреты в клиентском коде. Проверяй права доступа на сервере, валидацию, обработку пользовательского ввода и приватность.'],
+            ['Не верь уверенным заявлениям','Проси показать конкретные проверки. Самостоятельно открой сайт, проверь консоль, сеть, мобильную версию и сохранение данных.'],
+            ['Не разрешай ломать существующее','Сформулируй, что нельзя менять, попроси минимальный diff и регрессионную проверку прежних функций.'],
+            ['Финальная приёмка','Сопоставь готовый код с требованиями, отметь дефекты и попроси исправить их до публикации. Решение о готовности принимает человек.']
+          ],questions:[
+            {q:'Где должны защищаться данные и права доступа?',a:['Только скрытием кнопок в интерфейсе','Правилами/серверной проверкой; интерфейс сам по себе не защита','В комментарии к коду'],correct:1},
+            {q:'Что делать, если ИИ утверждает «всё протестировано»?',a:['Поверить без доказательств','Попросить конкретные проверки и повторить ключевые сценарии самостоятельно','Сразу выложить в продакшен'],correct:1},
+            {q:'Как не сломать уже работающие функции?',a:['Попросить менять всё сразу','Зафиксировать существующее поведение, менять минимально и провести регрессионные проверки','Удалить старые функции'],correct:1},
+            {q:'Кто отвечает за принятие результата?',a:['Только нейросеть','Сотрудник проверяет результат по критериям и отвечает за приёмку','Первый пользователь сайта'],correct:1}
+          ]}
+        ];
+        const trainingFinalFields = [
+          {id:'siteTopic',label:'1. На какую тему сайт',hint:'Опишите тематику, целевую аудиторию и основную задачу сайта.'},
+          {id:'siteDesign',label:'2. Как всё должно выглядеть',hint:'Структура страниц, стиль, цвета, шрифты, адаптивность, анимации и состояния интерфейса.'},
+          {id:'fullPrompt',label:'3. Полный промпт для нейросети DeepSeek',hint:'Полный готовый запрос: контекст, цель, функциональность, технологии, ограничения, этапы и критерии готовности.'},
+          {id:'codeCriteria',label:'4. По каким критериям вы оцените готовый код',hint:'Работоспособность, дизайн, адаптивность, безопасность, доступность, ошибки, производительность и тесты.'}
+        ];
+        const trainingEsc = value => String(value ?? '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+        const trainingDate = value => value?.toDate ? value.toDate() : (value ? new Date(value) : null);
+        async function saveTraining(patch) {
+          trainingRecord = {...(trainingRecord || {}), ...patch, uid:currentUserId, updatedAt:Timestamp.now()};
+          await setDoc(doc(db,'employee_training',currentUserId),trainingRecord,{merge:true});
+        }
+        function renderTrainingDays(activeDay) {
+          const labels=['1 · Промпт','2 · Качество','3 · Проверка'];
+          document.getElementById('trainingDays').innerHTML=labels.map((label,i)=>{
+            const done=(trainingRecord?.days?.[i+1]?.passed===true);
+            const active=(i+1===activeDay);
+            return '<div class="training-day '+(done?'done ':'')+(active?'active':'')+'"><strong>'+(done?'✓ ':'')+label+'</strong><div class="training-note">'+(done?'Урок пройден':active?'Текущий урок':'Закрыто до завершения предыдущего дня')+'</div></div>';
+          }).join('');
+        }
+        function showTrainingGate() { document.getElementById('trainingGate').style.display='block'; document.body.style.overflow='hidden'; }
+        function hideTrainingGate() { document.getElementById('trainingGate').style.display='none'; document.body.style.overflow=''; }
+        async function loadTraining() {
+          try {
+            const snap=await getDoc(doc(db,'employee_training',currentUserId));
+            trainingRecord=snap.exists()?snap.data():{uid:currentUserId,days:{},status:'in_progress',createdAt:Timestamp.now()};
+            if (!snap.exists()) await setDoc(doc(db,'employee_training',currentUserId),trainingRecord);
+            if (trainingRecord.status==='completed') { hideTrainingGate(); return; }
+            showTrainingGate();
+            renderTrainingStage();
+          } catch(err) {
+            console.error('Training load failed:',err);
+            showTrainingGate();
+            document.getElementById('trainingContent').innerHTML='<h3>Не удалось загрузить обучение</h3><p class="training-note">Ошибка доступа к данным обучения. Проверьте правила Firestore для employee_training. '+trainingEsc(err.message)+'</p>';
+          }
+        }
+        function renderTrainingStage() {
+          if(trainingTick) clearInterval(trainingTick);
+          if(trainingCardTick) clearInterval(trainingCardTick);
+          const days=trainingRecord?.days||{};
+          const nextDay=[1,2,3].find(d=>days[d]?.passed!==true) || 4;
+          if(nextDay===4) { renderFinalAssignment(); return; }
+          const prev=days[nextDay-1];
+          if(nextDay>1 && (!prev?.passed || !prev?.passedAt)) { renderTrainingDays(nextDay); return; }
+          const unlock=nextDay>1?trainingDate(prev.passedAt).getTime()+24*60*60*1000:0;
+          const wait=Math.max(0,unlock-Date.now());
+          renderTrainingDays(nextDay);
+          if(wait>0) {
+            document.getElementById('trainingContent').innerHTML='<h2>Урок '+nextDay+' откроется позже</h2><p class="training-lead">Между днями обучения должен пройти полный календарный интервал в 24 часа.</p><div class="training-status">До следующего урока: <strong id="trainingWait"></strong></div>';
+            const updateWait=()=>{const remain=Math.max(0,unlock-Date.now());const el=document.getElementById('trainingWait');if(el)el.textContent=Math.floor(remain/3600000)+' ч '+Math.floor(remain%3600000/60000)+' мин';if(remain<=0){clearInterval(trainingTick);renderTrainingStage();}};
+            updateWait();trainingTick=setInterval(updateWait,30000);return;
+          }
+          const lesson=trainingLessons[nextDay-1];
+          const day=days[nextDay]||{};
+          const started=trainingDate(day.startedAt);
+          const elapsed=started?Math.max(0,Math.floor((Date.now()-started.getTime())/1000)):0;
+          const remaining=Math.max(0,1800-elapsed);
+          const failed=day.lastPassed===false;
+          document.getElementById('trainingContent').innerHTML='<div class="training-pulse">УРОК · ДЕНЬ '+nextDay+' · 30 МИНУТ</div><h2>'+trainingEsc(lesson.title)+'</h2><p class="training-lead">'+trainingEsc(lesson.subtitle)+'</p><div class="training-progress"><span id="trainingLessonProgress" style="width:'+Math.min(100,elapsed/1800*100)+'%"></span></div><div class="training-note">Осталось обязательного времени: <strong id="trainingTimer"></strong>. Карточка меняется каждые 15 секунд.</div><div id="trainingCard" class="training-card"></div><div class="training-actions"><button class="training-btn secondary" id="trainingPrevCard">← Назад</button><button class="training-btn" id="trainingNextCard">Следующая карточка →</button><button class="training-btn" id="trainingToQuiz" '+(remaining>0?'disabled':'')+'>Перейти к тесту</button></div>'+(failed?'<div class="training-status">Тест не сдан. Повторите тему целиком и пройдите тест ещё раз.</div>':'');
+          function cardAt(idx){trainingCardIndex=(idx+lesson.cards.length)%lesson.cards.length;const item=lesson.cards[trainingCardIndex];const node=document.getElementById('trainingCard');if(node)node.innerHTML='<div class="training-pulse">КАРТОЧКА '+(trainingCardIndex+1)+' / '+lesson.cards.length+'</div><h3>'+trainingEsc(item[0])+'</h3><p>'+trainingEsc(item[1])+'</p>';}
+          cardAt(0);
+          document.getElementById('trainingPrevCard').onclick=()=>cardAt(trainingCardIndex-1);
+          document.getElementById('trainingNextCard').onclick=()=>cardAt(trainingCardIndex+1);
+          document.getElementById('trainingToQuiz').onclick=()=>renderLessonQuiz(nextDay);
+          trainingCardTick=setInterval(()=>cardAt(trainingCardIndex+1),15000);
+          if(!started) { saveTraining({days:{...days,[nextDay]:{...day,startedAt:Timestamp.now(),attempts:day.attempts||0}}}).catch(console.error); }
+          const startedMs=started?started.getTime():Date.now();
+          const updateTimer=()=>{const elapsedNow=Math.max(0,Math.floor((Date.now()-startedMs)/1000));const left=Math.max(0,1800-elapsedNow);const timer=document.getElementById('trainingTimer');const bar=document.getElementById('trainingLessonProgress');const btn=document.getElementById('trainingToQuiz');if(timer)timer.textContent=Math.floor(left/60)+' мин '+(left%60)+' сек';if(bar)bar.style.width=Math.min(100,elapsedNow/1800*100)+'%';if(btn)btn.disabled=left>0;if(left===0&&trainingTick){clearInterval(trainingTick);trainingTick=null;}};
+          updateTimer();trainingTick=setInterval(updateTimer,1000);
+        }
+        function renderLessonQuiz(dayNum) {
+          if(trainingCardTick)clearInterval(trainingCardTick);if(trainingTick)clearInterval(trainingTick);
+          const lesson=trainingLessons[dayNum-1];const savedAnswers=trainingRecord?.days?.[dayNum]?.answers||{};
+          document.getElementById('trainingContent').innerHTML='<h2>Тест: '+trainingEsc(lesson.title)+'</h2><p class="training-lead">Нужно правильно ответить минимум на 3 вопроса из 4. При неудаче повторите урок и попробуйте снова.</p><form id="trainingQuizForm">'+lesson.questions.map((q,i)=>'<div class="training-question"><strong>'+(i+1)+'. '+trainingEsc(q.q)+'</strong>'+q.a.map((answer,j)=>'<label><input type="radio" name="q'+i+'" value="'+j+'" '+(String(savedAnswers[i])===String(j)?'checked':'')+' required><span>'+trainingEsc(answer)+'</span></label>').join('')+'</div>').join('')+'<div class="training-actions"><button type="button" class="training-btn secondary" id="trainingRepeat">Повторить тему</button><button class="training-btn" type="submit">Проверить ответы</button></div><div id="quizResult" aria-live="polite"></div></form>';
+          document.getElementById('trainingRepeat').onclick=()=>renderTrainingStage();
+          document.getElementById('trainingQuizForm').onsubmit=async ev=>{ev.preventDefault();const answers={};lesson.questions.forEach((q,i)=>{answers[i]=Number(new FormData(ev.target).get('q'+i));});const score=lesson.questions.filter((q,i)=>answers[i]===q.correct).length;const passed=score>=3;const days={...(trainingRecord.days||{}),[dayNum]:{...(trainingRecord.days?.[dayNum]||{}),answers,score,attempts:(trainingRecord.days?.[dayNum]?.attempts||0)+1,lastPassed:passed,lastTestAt:Timestamp.now(),passed:passed||(trainingRecord.days?.[dayNum]?.passed===true),...(passed?{passedAt:Timestamp.now()}: {})}};await saveTraining({days,status:passed&&dayNum===3?'final_pending':'in_progress'});document.getElementById('quizResult').innerHTML='<div class="training-status">'+(passed?'✅ Тест сдан: ':'❌ Тест не сдан: ')+score+' из 4.'+(passed?' Следующий урок откроется через 24 часа.':' Нужно повторить тему и пересдать.')+'</div><div class="training-actions"><button type="button" class="training-btn" id="quizContinue">'+(passed?'Продолжить':'Повторить урок')+'</button></div>';document.getElementById('quizContinue').onclick=()=>{if(passed){if(dayNum===3)renderFinalAssignment();else renderTrainingStage();}else renderTrainingStage();};};
+        }
+        function renderFinalAssignment() {
+          renderTrainingDays(3);
+          const final=trainingRecord?.finalAssignment||{};
+          document.getElementById('trainingContent').innerHTML='<div class="training-pulse">ФИНАЛЬНАЯ АТТЕСТАЦИЯ</div><h2>Создайте полноценный промпт для сайта</h2><p class="training-lead">Представьте, что вы ставите задачу DeepSeek. Заполните все четыре раздела подробно: итоговый ответ увидит администратор.</p><form id="trainingFinalForm">'+trainingFinalFields.map(f=>'<div class="form-group"><label for="'+f.id+'">'+trainingEsc(f.label)+' *</label><p class="training-note">'+trainingEsc(f.hint)+'</p><textarea class="training-input" style="min-height:'+(f.id==='fullPrompt'?220:120)+'px" id="'+f.id+'" required minlength="'+(f.id==='fullPrompt'?120:20)+'" maxlength="'+(f.id==='fullPrompt'?12000:3000)+'" placeholder="'+trainingEsc(f.hint)+'">'+trainingEsc(final[f.id]||'')+'</textarea></div>').join('')+'<div class="training-actions"><button class="training-btn" type="submit">Отправить финальную работу</button></div><div id="finalStatus" aria-live="polite"></div></form>';
+          document.getElementById('trainingFinalForm').onsubmit=async ev=>{ev.preventDefault();const answers={};trainingFinalFields.forEach(f=>answers[f.id]=document.getElementById(f.id).value.trim());if(trainingFinalFields.some(f=>answers[f.id].length<(f.id==='fullPrompt'?120:20))){document.getElementById('finalStatus').innerHTML='<div class="training-status">Заполните все разделы развёрнуто. Полный промпт должен содержать не менее 120 символов.</div>';return;}const finalAssignment={...answers,submittedAt:Timestamp.now(),status:'submitted'};await saveTraining({finalAssignment,status:'completed',completedAt:Timestamp.now()});document.getElementById('trainingContent').innerHTML='<div class="training-status"><h2>🎉 Обучение завершено!</h2><p>Все три урока пройдены, финальная работа сохранена и отправлена администратору на проверку.</p></div>';renderTrainingDays(3);};
+        }
         async function loadUserData() {
             if (!currentUserId) return;
             const userSnap = await getDoc(doc(db, "users", currentUserId));
@@ -417,13 +588,15 @@
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 const userDoc = await getDoc(doc(db, "users", user.uid));
-                const role = userDoc.data()?.role;
+                const userData = userDoc.data() || {};
+                const role = userData.role;
                 if (role !== 'admin' && role !== 'employee') {
                     window.location.href = 'index.html';
                     return;
                 }
                 currentUserId = user.uid;
                 await loadUserData();
+                if (userData.trainingRequired === true || (await getDoc(doc(db, "employee_training", user.uid))).exists()) await loadTraining();
                 loadAvailableTasks();
                 loadMyTasks();
                 loadHistory();
