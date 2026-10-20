@@ -307,7 +307,81 @@
             {q:'Кто отвечает за принятие результата?',a:['Только нейросеть','Сотрудник проверяет результат по критериям и отвечает за приёмку','Первый пользователь сайта'],correct:1}
           ]}
         ];
-        const trainingFinalFields = [
+        const trainingStudyTopics = [
+  "Постановка конкретной цели",
+  "Описание целевой аудитории",
+  "Сбор контекста задачи",
+  "Формулировка ожидаемого результата",
+  "Задание технических ограничений",
+  "Разбиение большой задачи на этапы",
+  "Уточнение неоднозначного запроса",
+  "Выбор формата ответа",
+  "Создание промпта для сайта",
+  "Промпт для генерации кода",
+  "Описание структуры проекта",
+  "Работа с существующим кодом",
+  "Требование не менять лишнее",
+  "Запрос архитектуры перед кодом",
+  "Подготовка примеров и референсов",
+  "Проверка понимания задачи",
+  "Составление критериев готовности",
+  "Построение визуальной системы",
+  "Выбор цветовой палитры",
+  "Настройка типографики",
+  "Создание сетки и отступов",
+  "Проектирование навигации",
+  "Разработка карточек интерфейса",
+  "Проектирование форм",
+  "Оформление кнопок и состояний",
+  "Адаптация под мобильные экраны",
+  "Улучшение доступности интерфейса",
+  "Единый стиль компонентов",
+  "Работа с пустыми состояниями",
+  "Оформление загрузки и ошибок",
+  "Создание понятных сообщений",
+  "Снижение визуального шума",
+  "Проверка удобства интерфейса",
+  "Итеративное улучшение дизайна",
+  "Проверка функциональности",
+  "Проверка сценариев пользователя",
+  "Поиск ошибок в консоли",
+  "Проверка сетевых запросов",
+  "Тестирование форм",
+  "Проверка входа и выхода",
+  "Проверка сохранения данных",
+  "Проверка обработки ошибок",
+  "Регрессионное тестирование",
+  "Проверка безопасности данных",
+  "Защита ключей и секретов",
+  "Настройка правил доступа",
+  "Проверка производительности",
+  "Проверка мобильной версии",
+  "Подготовка инструкции запуска",
+  "Финальная приёмка проекта"
+];
+        const trainingStudyTemplates = [
+  "Сформулируй конкретную цель по теме «{t}» одним понятным предложением.",
+  "Определи, кто будет пользоваться результатом и какие задачи этому человеку нужно решить.",
+  "Запиши исходные условия, имеющиеся материалы и важные сведения, без которых работу нельзя выполнить правильно.",
+  "Опиши конечный результат так, чтобы его можно было проверить, а не просто субъективно оценить.",
+  "Перечисли ограничения, обязательные требования и действия, которые выполнять нельзя.",
+  "Раздели работу на небольшие этапы и укажи правильный порядок их выполнения.",
+  "Если требование допускает разные толкования, сначала попроси уточнение вместо случайного выбора.",
+  "Укажи нужный формат результата: список, план, текст, код, файлы, таблица или пошаговая инструкция.",
+  "Добавь один конкретный пример желаемого результата, если он помогает убрать двусмысленность.",
+  "Попроси явно отметить допущения, неизвестные детали и риски, которые могут повлиять на итог.",
+  "Согласуй критерии успеха до начала выполнения, чтобы не менять цель в процессе.",
+  "Проверяй каждое требование отдельно и не считай красивое оформление доказательством работоспособности.",
+  "После первого результата найди конкретные недостатки и сформулируй воспроизводимые замечания.",
+  "Исправляй одну связанную группу проблем за раз и повторно проверяй затронутые функции.",
+  "В конце сравни готовый результат с исходными требованиями и перечисли, что действительно проверено."
+];
+        const trainingStudyCards = trainingStudyTopics.map((title,index) => {
+          const day = index < 17 ? 1 : index < 34 ? 2 : 3;
+          const text = trainingStudyTemplates.map(line => line.replaceAll('{t}', title));
+          return {day,title,text};
+        });
+                const trainingFinalFields = [
           {id:'siteTopic',label:'1. На какую тему сайт',hint:'Опишите тематику, целевую аудиторию и основную задачу сайта.'},
           {id:'siteDesign',label:'2. Как всё должно выглядеть',hint:'Структура страниц, стиль, цвета, шрифты, адаптивность, анимации и состояния интерфейса.'},
           {id:'fullPrompt',label:'3. Полный промпт для нейросети DeepSeek',hint:'Полный готовый запрос: контекст, цель, функциональность, технологии, ограничения, этапы и критерии готовности.'},
@@ -360,18 +434,24 @@
             updateWait();trainingTick=setInterval(updateWait,30000);return;
           }
           const lesson=trainingLessons[nextDay-1];
+          const lessonCards=trainingStudyCards.filter(card=>card.day===nextDay);
           const day=days[nextDay]||{};
           const started=trainingDate(day.startedAt);
           const elapsed=started?Math.max(0,Math.floor((Date.now()-started.getTime())/1000)):0;
           const remaining=Math.max(0,1800-elapsed);
           const failed=day.lastPassed===false;
-          document.getElementById('trainingContent').innerHTML='<div class="training-pulse">УРОК · ДЕНЬ '+nextDay+' · 30 МИНУТ</div><h2>'+trainingEsc(lesson.title)+'</h2><p class="training-lead">'+trainingEsc(lesson.subtitle)+'</p><div class="training-progress"><span id="trainingLessonProgress" style="width:'+Math.min(100,elapsed/1800*100)+'%"></span></div><div class="training-note">Осталось обязательного времени: <strong id="trainingTimer"></strong>. Карточка меняется каждые 15 секунд.</div><div id="trainingCard" class="training-card"></div><div class="training-actions"><button class="training-btn secondary" id="trainingPrevCard">← Назад</button><button class="training-btn" id="trainingNextCard">Следующая карточка →</button><button class="training-btn" id="trainingToQuiz" '+(remaining>0?'disabled':'')+'>Перейти к тесту</button></div>'+(failed?'<div class="training-status">Тест не сдан. Повторите тему целиком и пройдите тест ещё раз.</div>':'');
-          function cardAt(idx){trainingCardIndex=(idx+lesson.cards.length)%lesson.cards.length;const item=lesson.cards[trainingCardIndex];const node=document.getElementById('trainingCard');if(node)node.innerHTML='<div class="training-pulse">КАРТОЧКА '+(trainingCardIndex+1)+' / '+lesson.cards.length+'</div><h3>'+trainingEsc(item[0])+'</h3><p>'+trainingEsc(item[1])+'</p>';}
+          trainingCardIndex=0;
+          document.getElementById('trainingContent').innerHTML='<div class="training-pulse">УРОК · ДЕНЬ '+nextDay+' · 30 МИНУТ</div><h2>'+trainingEsc(lesson.title)+'</h2><p class="training-lead">'+trainingEsc(lesson.subtitle)+'</p><div class="training-progress"><span id="trainingLessonProgress" style="width:'+Math.min(100,elapsed/1800*100)+'%"></span></div><div class="training-note">Осталось обязательного времени: <strong id="trainingTimer"></strong>. В уроке '+lessonCards.length+' карточек по 15 предложений. Перелистывайте вручную.</div><div id="trainingCard" class="training-card"></div><div class="training-actions"><button class="training-btn secondary" id="trainingPrevCard">← Назад</button><button class="training-btn" id="trainingNextCard">Следующая карточка →</button><button class="training-btn" id="trainingToQuiz" '+(remaining>0?'disabled':'')+'>Перейти к тесту</button></div>'+(failed?'<div class="training-status">Тест не сдан. Повторите тему целиком и пройдите тест ещё раз.</div>':'');
+          function cardAt(idx){
+            trainingCardIndex=(idx+lessonCards.length)%lessonCards.length;
+            const item=lessonCards[trainingCardIndex];
+            const node=document.getElementById('trainingCard');
+            if(node)node.innerHTML='<div class="training-pulse">КАРТОЧКА '+(trainingCardIndex+1)+' / '+lessonCards.length+'</div><h3>'+trainingEsc(item.title)+'</h3><ol>'+item.text.map(sentence=>'<li>'+trainingEsc(sentence)+'</li>').join('')+'</ol>';
+          }
           cardAt(0);
           document.getElementById('trainingPrevCard').onclick=()=>cardAt(trainingCardIndex-1);
           document.getElementById('trainingNextCard').onclick=()=>cardAt(trainingCardIndex+1);
           document.getElementById('trainingToQuiz').onclick=()=>renderLessonQuiz(nextDay);
-          trainingCardTick=setInterval(()=>cardAt(trainingCardIndex+1),15000);
           if(!started) { saveTraining({days:{...days,[nextDay]:{...day,startedAt:Timestamp.now(),attempts:day.attempts||0}}}).catch(console.error); }
           const startedMs=started?started.getTime():Date.now();
           const updateTimer=()=>{const elapsedNow=Math.max(0,Math.floor((Date.now()-startedMs)/1000));const left=Math.max(0,1800-elapsedNow);const timer=document.getElementById('trainingTimer');const bar=document.getElementById('trainingLessonProgress');const btn=document.getElementById('trainingToQuiz');if(timer)timer.textContent=Math.floor(left/60)+' мин '+(left%60)+' сек';if(bar)bar.style.width=Math.min(100,elapsedNow/1800*100)+'%';if(btn)btn.disabled=left>0;if(left===0&&trainingTick){clearInterval(trainingTick);trainingTick=null;}};
