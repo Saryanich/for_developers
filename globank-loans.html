@@ -30,7 +30,7 @@ import {initializeApp} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-
 import {getAuth,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import {getFirestore,doc,getDoc,getDocs,collection,query,where,orderBy,updateDoc} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 const firebaseConfig={apiKey:"AIzaSyA6GGJxAiao77U7_9mBUEjftmS_FnSWbIw",authDomain:"glob-data.firebaseapp.com",projectId:"glob-data",storageBucket:"glob-data.firebasestorage.app",messagingSenderId:"122757049174",appId:"1:122757049174:web:ebb425edd0e1a8ea9a44f7"};
-const app=initializeApp(firebaseConfig,"globankLoansAdmin");
+const app=initializeApp(firebaseConfig);
 const auth=getAuth(app),db=getFirestore(app);
 let currentFilter="pending",currentLoanId=null,hasInk=false,allowed=false,loading=false;
 const $=id=>document.getElementById(id);
