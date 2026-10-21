@@ -936,6 +936,13 @@
                 <div style="margin:8px 0;">📧 Почта: <strong>${escapeHTML(account.email || 'Не указана в users')}</strong></div>
                 <div style="margin:8px 0;font-size:12px;color:#666;">UID: ${escapeHTML(account.uid)}</div>
                 <div class="form-group" style="margin-top:16px;">
+                    <label for="targetAccountSelector">Перенести данные в аккаунт (Global ID)</label>
+                    <select id="targetAccountSelector">
+                        <option value="">Выберите аккаунт-получатель…</option>
+                        ${managedAccounts.filter(u => u.uid !== account.uid && u.role !== 'admin' && !(auth.currentUser && u.uid === auth.currentUser.uid)).map(u => '<option value="' + escapeHTML(u.uid) + '">' + escapeHTML(u.globalId + ' — ' + (u.email || 'почта не указана')) + '</option>').join('')}
+                    </select>
+                </div>
+                <div class="form-group" style="margin-top:16px;">
                     <label for="newAccountPassword">Новый пароль (не менее 8 символов)</label>
                     <input type="password" id="newAccountPassword" minlength="8" autocomplete="new-password" placeholder="Введите новый пароль">
                 </div>
@@ -1000,23 +1007,11 @@
                 return;
             }
 
-            const candidates = managedAccounts.filter(u =>
-                u.uid !== sourceAccount.uid && u.role !== 'admin' &&
-                !(auth.currentUser && u.uid === auth.currentUser.uid)
-            );
-            if (!candidates.length) {
-                alert('Нет подходящих аккаунтов-получателей. Нужен другой пользователь не с ролью admin.');
-                return;
-            }
-
-            const chosen = prompt(
-                'Выберите Global ID аккаунта-получателя, введя его точно:\\n\\n' +
-                candidates.map(u => u.globalId + ' — ' + (u.email || 'почта не указана')).join('\\n')
-            );
-            if (chosen === null) return;
-            const target = candidates.find(u => u.globalId === chosen.trim());
-            if (!target) {
-                alert('Такой Global ID не найден в списке. Данные не перенесены.');
+            const targetUid = document.getElementById('targetAccountSelector')?.value;
+            const target = managedAccounts.find(u => u.uid === targetUid);
+            if (!target || target.uid === sourceAccount.uid || target.role === 'admin' ||
+                (auth.currentUser && target.uid === auth.currentUser.uid)) {
+                alert('Выберите допустимый аккаунт-получатель из списка.');
                 return;
             }
             const confirmation = prompt(
