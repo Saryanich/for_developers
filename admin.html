@@ -137,6 +137,17 @@
         .flex-row { display: flex; gap: 12px; flex-wrap: wrap; }
         .info-text { font-size: 12px; color: #666; margin-top: 8px; }
         .text-danger { color: #ff3b30; }
+        .loan-filters { display:flex; gap:8px; flex-wrap:wrap; margin:16px 0; }
+        .loan-card { background:#f8f9fc; border:1px solid #e5e5ea; border-radius:18px; padding:20px; margin-bottom:14px; }
+        .loan-top { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; border-bottom:1px solid #e5e5ea; padding-bottom:12px; margin-bottom:12px; }
+        .loan-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
+        .loan-field label { display:block; color:#777; font-size:11px; text-transform:uppercase; }
+        .loan-field div { overflow-wrap:anywhere; font-weight:600; margin-top:3px; }
+        .loan-status { display:inline-block; padding:4px 10px; border-radius:20px; background:#fff3e0; color:#a45b00; font-size:12px; font-weight:600; }
+        .loan-status.completed { background:#e6f7e6; color:#2e7d32; }
+        .loan-status.rejected { background:#fee2e2; color:#b91c1c; }
+        .loan-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+        .loan-empty { padding:24px; text-align:center; color:#777; background:#f8f9fc; border:1px dashed #ddd; border-radius:16px; }
         @media (max-width: 768px) {
             .stats-grid { grid-template-columns: 1fr; }
             .header { flex-direction: column; text-align: center; }
@@ -163,6 +174,7 @@
                 <button class="main-tab" onclick="switchMainTab('orders')">📦 Заказы IT Global</button>
                 <button class="main-tab" onclick="switchMainTab('trainingStudents')">🎓 Учащиеся сотрудники</button>
                 <button class="main-tab" onclick="switchMainTab('accounts')">🔐 Аккаунты</button>
+                <button class="main-tab" onclick="switchMainTab('loans')">🏦 GloBank Loans</button>
             </div>
             
             <div id="employeesSection">
@@ -213,6 +225,36 @@
                 </div>
                 <div id="accountDetails" class="employee-card" style="display:none;"></div>
                 <p class="info-text">Администратор может вручную задать новый пароль выбранному пользователю. Для этого требуется серверная Cloud Function в Firebase.</p>
+            </div>
+
+
+            <div id="loansSection" style="display:none;">
+                <div class="flex-row" style="margin-bottom:16px;align-items:center;">
+                    <button class="btn btn-primary" onclick="loadLoans()">↻ Обновить заявки</button>
+                    <span class="info-text" id="loansStatus" role="status" aria-live="polite"></span>
+                </div>
+                <div class="stats-grid" id="loansStats"></div>
+                <div class="loan-filters" id="loanFilters">
+                    <button class="btn btn-primary loan-filter active" data-filter="pending">На модерации</button>
+                    <button class="btn btn-outline loan-filter" data-filter="waiting_user_signature">Подпись клиента</button>
+                    <button class="btn btn-outline loan-filter" data-filter="waiting_admin_signature">Подпись админа</button>
+                    <button class="btn btn-outline loan-filter" data-filter="completed">Завершённые</button>
+                    <button class="btn btn-outline loan-filter" data-filter="rejected">Отклонённые</button>
+                    <button class="btn btn-outline loan-filter" data-filter="all">Все заявки</button>
+                </div>
+                <div id="loansList">Загрузка заявок…</div>
+            </div>
+            <div id="loanSignatureModal" class="modal" style="z-index:1100;">
+                <div class="modal-content" style="max-width:650px;">
+                    <h3 style="margin-bottom:8px;">Подпись администратора</h3>
+                    <p class="info-text">Проверьте заявку перед подписанием договора.</p>
+                    <canvas id="loanSignatureCanvas" width="600" height="240" style="display:block;width:100%;height:220px;border:2px dashed #cbd5e1;border-radius:12px;touch-action:none;margin:14px 0;background:#fff;"></canvas>
+                    <div class="flex-row">
+                        <button class="btn btn-outline" id="clearLoanSignature">Очистить</button>
+                        <button class="btn btn-success" id="saveLoanSignature">Подписать договор</button>
+                        <button class="btn btn-outline" id="closeLoanSignature">Отмена</button>
+                    </div>
+                </div>
             </div>
 
             <div id="ordersSection" style="display:none;">
@@ -321,7 +363,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getAuth, signOut, onAuthStateChanged, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         import { getFirestore, doc, getDoc, getDocs, updateDoc, deleteDoc, collection, query, where, addDoc, orderBy, Timestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js";
 
@@ -340,6 +382,10 @@
         
         let currentTab = 'employees';
         let currentOrdersFilter = 'new';
+        let currentLoansFilter = 'pending';
+        let loansBusy = false;
+        let currentLoanSignatureId = null;
+        let loanSignatureHasInk = false;
         let ordersBusy = false;
         let currentEmployeeId = null;
         let currentEmployeePoints = 0;
@@ -973,6 +1019,156 @@
             }
         }
 
+
+        // ========== ЗАЯВКИ GLOBANK LOANS ==========
+        const loanStatusLabels = {
+            pending: 'На модерации',
+            waiting_user_signature: 'Ожидает подписи клиента',
+            waiting_admin_signature: 'Ожидает подписи администратора',
+            completed: 'Завершён',
+            rejected: 'Отклонён'
+        };
+        const loanDate = value => {
+            try {
+                const d = value?.toDate ? value.toDate() : new Date(value);
+                return value && Number.isFinite(d.getTime()) ? d.toLocaleString('ru-RU') : '—';
+            } catch { return '—'; }
+        };
+        const loanMoney = value => Number.isFinite(Number(value)) ? Number(value).toLocaleString('ru-RU') + ' ₽' : '—';
+        function loanNotice(text, isError = false) {
+            const node = document.getElementById('loansStatus');
+            if (node) { node.textContent = text; node.style.color = isError ? '#ff3b30' : '#666'; }
+        }
+        window.loadLoans = async (filter = currentLoansFilter) => {
+            if (loansBusy) return;
+            currentLoansFilter = filter || 'pending';
+            loansBusy = true;
+            const list = document.getElementById('loansList');
+            list.innerHTML = '<div class="loan-empty">Загрузка заявок…</div>';
+            try {
+                const snap = await getDocs(collection(db, 'loans'));
+                const loans = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                loans.sort((a,b) => {
+                    const av = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt || 0).getTime();
+                    const bv = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt || 0).getTime();
+                    return bv - av;
+                });
+                const counts = {pending:0, waiting_user_signature:0, waiting_admin_signature:0, completed:0, rejected:0};
+                loans.forEach(l => { if (Object.prototype.hasOwnProperty.call(counts, l.status)) counts[l.status]++; });
+                document.getElementById('loansStats').innerHTML = [
+                    ['На модерации',counts.pending],['Подпись клиента',counts.waiting_user_signature],
+                    ['Подпись админа',counts.waiting_admin_signature],['Завершено',counts.completed],['Отклонено',counts.rejected]
+                ].map(([label,count]) => '<div class="stat-card"><div class="stat-number">'+count+'</div><div class="stat-label">'+label+'</div></div>').join('');
+                const shown = currentLoansFilter === 'all' ? loans : loans.filter(l => l.status === currentLoansFilter);
+                if (!shown.length) {
+                    list.innerHTML = '<div class="loan-empty">Заявок в этой категории пока нет.</div>';
+                    loanNotice('Заявок: '+loans.length);
+                    return;
+                }
+                list.innerHTML = shown.map(l => {
+                    const status = escapeHTML(loanStatusLabels[l.status] || l.status || 'Неизвестный статус');
+                    let actions = '';
+                    if (l.status === 'pending') actions += '<button class="btn btn-success" data-loan-action="approve" data-id="'+escapeHTML(l.id)+'">✓ Одобрить</button><button class="btn btn-danger" data-loan-action="reject" data-id="'+escapeHTML(l.id)+'">✕ Отказать</button>';
+                    if (l.status === 'waiting_admin_signature') actions += '<button class="btn btn-primary" data-loan-action="sign" data-id="'+escapeHTML(l.id)+'">✍ Подписать договор</button>';
+                    if (!['completed','rejected'].includes(l.status)) actions += '<button class="btn btn-warning" data-loan-action="reject" data-id="'+escapeHTML(l.id)+'">Отказать</button>';
+                    return '<article class="loan-card"><div class="loan-top"><div><strong>'+escapeHTML(l.fullName)+'</strong><div class="info-text">'+escapeHTML(l.userEmail)+'</div></div><div><span class="loan-status '+escapeHTML(l.status)+'">'+status+'</span><div class="info-text">'+loanDate(l.createdAt)+'</div></div></div>'+
+                    '<div class="loan-grid">'+
+                    '<div class="loan-field"><label>Global ID</label><div>'+escapeHTML(l.userGlobalId)+'</div></div>'+
+                    '<div class="loan-field"><label>Телефон</label><div>'+escapeHTML(l.phoneNumber)+'</div></div>'+
+                    '<div class="loan-field"><label>Сумма займа</label><div>'+loanMoney(l.amount)+'</div></div>'+
+                    '<div class="loan-field"><label>Срок</label><div>'+escapeHTML(l.term)+' дней</div></div>'+
+                    '<div class="loan-field"><label>К выплате</label><div>'+loanMoney(l.totalToPay)+'</div></div>'+
+                    '<div class="loan-field"><label>Цель займа</label><div>'+escapeHTML(l.reason)+'</div></div>'+
+                    '<div class="loan-field"><label>Карта для получения</label><div>'+escapeHTML(l.userCardNumber)+'</div></div>'+
+                    '<div class="loan-field"><label>СНИЛС</label><div>'+escapeHTML(l.snils)+'</div></div>'+
+                    '</div>'+(l.rejectedReason?'<p style="margin-top:10px"><strong>Причина отказа:</strong> '+escapeHTML(l.rejectedReason)+'</p>':'')+
+                    (l.adminSignature?'<p class="info-text" style="margin-top:10px">Подпись администратора сохранена.</p>':'')+
+                    '<div class="loan-actions">'+actions+'</div></article>';
+                }).join('');
+                loanNotice('Всего заявок: '+loans.length);
+            } catch (err) {
+                console.error('GloBank loans load failed', err);
+                list.innerHTML = '<div class="loan-empty text-danger">Не удалось загрузить заявки. Проверьте правила Firestore для коллекции loans. '+escapeHTML(err.message)+'</div>';
+                loanNotice('Ошибка загрузки заявок', true);
+            } finally { loansBusy = false; }
+        };
+        async function actOnLoan(loanId, action) {
+            try {
+                const ref = doc(db, 'loans', loanId);
+                const snap = await getDoc(ref);
+                if (!snap.exists()) throw new Error('Заявка не найдена.');
+                const loan = snap.data();
+                if (action === 'approve') {
+                    if (loan.status !== 'pending') throw new Error('Статус заявки уже изменён.');
+                    if (!confirm('Одобрить заявку и передать договор клиенту на подпись?')) return;
+                    await updateDoc(ref, {status:'waiting_user_signature'});
+                } else {
+                    if (['completed','rejected'].includes(loan.status)) throw new Error('Заявка уже закрыта.');
+                    const reason = (prompt('Укажите причину отказа:') || '').trim();
+                    if (!reason) return;
+                    if (reason.length > 500) throw new Error('Причина должна быть не длиннее 500 символов.');
+                    if (!confirm('Отклонить заявку?')) return;
+                    await updateDoc(ref, {status:'rejected', rejectedReason:reason});
+                }
+                loanNotice('Изменения сохранены.');
+                await loadLoans(currentLoansFilter);
+            } catch (err) {
+                loanNotice('Не удалось изменить заявку: '+err.message, true);
+                alert('Не удалось изменить заявку: '+err.message);
+            }
+        }
+        document.getElementById('loansList').addEventListener('click', e => {
+            const button = e.target.closest('button[data-loan-action]');
+            if (!button) return;
+            if (button.dataset.loanAction === 'sign') openLoanSignature(button.dataset.id);
+            else actOnLoan(button.dataset.id, button.dataset.loanAction);
+        });
+        document.getElementById('loanFilters').addEventListener('click', e => {
+            const button = e.target.closest('button[data-filter]');
+            if (!button || loansBusy) return;
+            currentLoansFilter = button.dataset.filter;
+            document.querySelectorAll('#loanFilters button').forEach(b => {
+                const active = b === button;
+                b.classList.toggle('active', active);
+                b.classList.toggle('btn-primary', active);
+                b.classList.toggle('btn-outline', !active);
+            });
+            loadLoans(currentLoansFilter);
+        });
+        const loanCanvas = document.getElementById('loanSignatureCanvas');
+        const loanCtx = loanCanvas.getContext('2d');
+        loanCtx.lineWidth = 2.5; loanCtx.lineCap = 'round'; loanCtx.strokeStyle = '#102a56';
+        let loanDrawing = false;
+        function loanPoint(e) {
+            const r = loanCanvas.getBoundingClientRect();
+            return {x:(e.clientX-r.left)*loanCanvas.width/r.width, y:(e.clientY-r.top)*loanCanvas.height/r.height};
+        }
+        loanCanvas.addEventListener('pointerdown', e => { loanDrawing=true; loanSignatureHasInk=true; loanCanvas.setPointerCapture(e.pointerId); const p=loanPoint(e); loanCtx.beginPath(); loanCtx.moveTo(p.x,p.y); });
+        loanCanvas.addEventListener('pointermove', e => { if(!loanDrawing)return; const p=loanPoint(e); loanCtx.lineTo(p.x,p.y); loanCtx.stroke(); });
+        ['pointerup','pointercancel','pointerleave'].forEach(name => loanCanvas.addEventListener(name, () => loanDrawing=false));
+        function openLoanSignature(id) {
+            currentLoanSignatureId=id; loanSignatureHasInk=false; loanCtx.clearRect(0,0,loanCanvas.width,loanCanvas.height);
+            document.getElementById('loanSignatureModal').style.display='flex';
+        }
+        function closeLoanSignature() {
+            document.getElementById('loanSignatureModal').style.display='none';
+            currentLoanSignatureId=null; loanSignatureHasInk=false;
+        }
+        document.getElementById('clearLoanSignature').addEventListener('click', () => { loanCtx.clearRect(0,0,loanCanvas.width,loanCanvas.height); loanSignatureHasInk=false; });
+        document.getElementById('closeLoanSignature').addEventListener('click', closeLoanSignature);
+        document.getElementById('saveLoanSignature').addEventListener('click', async () => {
+            if (!currentLoanSignatureId || !loanSignatureHasInk) { loanNotice('Сначала поставьте подпись.', true); return; }
+            if (!confirm('Подписать договор и завершить заявку?')) return;
+            const button = document.getElementById('saveLoanSignature'); button.disabled=true;
+            try {
+                const ref=doc(db,'loans',currentLoanSignatureId), snap=await getDoc(ref);
+                if (!snap.exists() || snap.data().status !== 'waiting_admin_signature') throw new Error('Заявка больше не ожидает подписи администратора.');
+                await updateDoc(ref,{adminSignature:loanCanvas.toDataURL('image/png'),status:'completed'});
+                closeLoanSignature(); loanNotice('Договор подписан.'); await loadLoans(currentLoansFilter);
+            } catch(err) { loanNotice('Не удалось подписать договор: '+err.message,true); alert('Не удалось подписать договор: '+err.message); }
+            finally { button.disabled=false; }
+        });
+
         window.switchMainTab = (tab) => {
             currentTab = tab;
             document.querySelectorAll('.main-tab').forEach(t => t.classList.remove('active'));
@@ -986,6 +1182,7 @@
             document.getElementById('ordersSection').style.display = tab === 'orders' ? 'block' : 'none';
             document.getElementById('trainingStudentsSection').style.display = tab === 'trainingStudents' ? 'block' : 'none';
             document.getElementById('accountsSection').style.display = tab === 'accounts' ? 'block' : 'none';
+            document.getElementById('loansSection').style.display = tab === 'loans' ? 'block' : 'none';
             
             if (tab === 'employees') loadEmployees();
             else if (tab === 'tasks') loadTasks();
@@ -995,6 +1192,7 @@
             else if (tab === 'orders') loadOrders(currentOrdersFilter);
             else if (tab === 'trainingStudents') loadTrainingStudents();
             else if (tab === 'accounts') loadManagedAccounts();
+            else if (tab === 'loans') loadLoans(currentLoansFilter);
         };
         
         window.logout = async () => {
