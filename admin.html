@@ -212,7 +212,7 @@
                     </select>
                 </div>
                 <div id="accountDetails" class="employee-card" style="display:none;"></div>
-                <p class="info-text">«Восстановить пароль» отправляет ссылку сброса пароля на почту пользователя. Удаление аккаунта необратимо.</p>
+                <p class="info-text">Можно отправить ссылку сброса на почту или задать новый пароль вручную. «Очистить аккаунт» удаляет профиль users и привязки global_ids, но оставляет пользователя в Firebase Authentication.</p>
             </div>
 
             <div id="ordersSection" style="display:none;">
@@ -935,18 +935,25 @@
                 <div style="margin:8px 0;">🆔 Global ID: <strong>${escapeHTML(account.globalId)}</strong></div>
                 <div style="margin:8px 0;">📧 Почта: <strong>${escapeHTML(account.email || 'Не указана в users')}</strong></div>
                 <div style="margin:8px 0;font-size:12px;color:#666;">UID: ${escapeHTML(account.uid)}</div>
-                <div class="flex-row" style="margin-top:16px;">
-                    <button class="btn btn-primary" id="sendResetEmailButton" ${account.email ? '' : 'disabled'}>✉️ Восстановить пароль</button>
-                    <button class="btn btn-danger" id="deleteAccountButton" ${isSelf || isAdminAccount ? 'disabled' : ''}>🗑 Удалить аккаунт полностью</button>
+                <div class="form-group" style="margin-top:16px;">
+                    <label for="newAccountPassword">Новый пароль (не менее 8 символов)</label>
+                    <input type="password" id="newAccountPassword" minlength="8" autocomplete="new-password" placeholder="Введите новый пароль">
                 </div>
-                ${isSelf ? '<p class="info-text text-danger">Нельзя удалить собственный аккаунт администратора.</p>' : ''}
-                ${isAdminAccount && !isSelf ? '<p class="info-text text-danger">Удаление аккаунтов администраторов запрещено из панели.</p>' : ''}
+                <div class="flex-row">
+                    <button class="btn btn-primary" id="sendResetEmailButton" ${account.email ? '' : 'disabled'}>✉️ Отправить письмо</button>
+                    <button class="btn btn-warning" id="setAccountPasswordButton" ${isSelf || isAdminAccount ? 'disabled' : ''}>🔑 Задать новый пароль</button>
+                    <button class="btn btn-danger" id="clearAccountButton" ${isSelf || isAdminAccount ? 'disabled' : ''}>🧹 Очистить аккаунт</button>
+                </div>
+                ${isSelf ? '<p class="info-text text-danger">Нельзя изменять пароль или очищать собственный аккаунт администратора.</p>' : ''}
+                ${isAdminAccount && !isSelf ? '<p class="info-text text-danger">Изменение пароля и очистка аккаунтов администраторов запрещены.</p>' : ''}
             `;
 
             const resetButton = document.getElementById('sendResetEmailButton');
             if (resetButton) resetButton.onclick = () => sendAccountPasswordReset(account);
-            const deleteButton = document.getElementById('deleteAccountButton');
-            if (deleteButton) deleteButton.onclick = () => deleteManagedAccount(account);
+            const setPasswordButton = document.getElementById('setAccountPasswordButton');
+            if (setPasswordButton) setPasswordButton.onclick = () => setManagedAccountPassword(account);
+            const clearButton = document.getElementById('clearAccountButton');
+            if (clearButton) clearButton.onclick = () => clearManagedAccount(account);
         };
 
         async function sendAccountPasswordReset(account) {
@@ -963,38 +970,59 @@
             }
         }
 
-        async function deleteManagedAccount(account) {
+        async function setManagedAccountPassword(account) {
             if (!account || account.role === 'admin' || (auth.currentUser && account.uid === auth.currentUser.uid)) {
-                alert('Этот аккаунт нельзя удалить из панели.');
+                alert('Нельзя менять пароль этого аккаунта из панели.');
                 return;
             }
-            const confirmation = prompt(
-                'Удаление необратимо. Будут удалены Firebase Authentication, users/' +
-                account.uid + ', запись обучения и привязки Global ID.\n\n' +
-                'Чтобы подтвердить, введите Global ID: ' + account.globalId
-            );
-            if (confirmation !== account.globalId) {
-                if (confirmation !== null) alert('Global ID не совпадает. Аккаунт не удалён.');
+            const input = document.getElementById('newAccountPassword');
+            const password = input ? input.value : '';
+            if (password.length < 8) {
+                alert('Новый пароль должен содержать не менее 8 символов.');
                 return;
             }
-            const button = document.getElementById('deleteAccountButton');
-            if (button) { button.disabled = true; button.textContent = 'Удаление…'; }
+            if (!confirm('Задать новый пароль для ' + account.globalId + '? Передайте пароль пользователю безопасным способом.')) return;
             try {
-                const deleteUser = httpsCallable(getFunctions(app), 'adminDeleteUser');
-                await deleteUser({ uid: account.uid });
-                alert('Аккаунт удалён из Firebase Authentication и Firestore.');
-                managedAccounts = managedAccounts.filter(u => u.uid !== account.uid);
-                const selector = document.getElementById('accountSelector');
-                selector.value = '';
-                window.selectAccountForManagement();
-                await window.loadManagedAccounts();
+                const setPassword = httpsCallable(getFunctions(app), 'adminSetUserPassword');
+                await setPassword({ uid: account.uid, password });
+                input.value = '';
+                alert('Пароль обновлён. Пользователь сможет войти с новым паролем.');
             } catch (err) {
-                alert('Не удалось удалить аккаунт: ' + (err.code || err.message) +
-                    '\nПроверьте, что Cloud Function adminDeleteUser развёрнута в проекте glob-data.');
-                if (button) { button.disabled = false; button.textContent = '🗑 Удалить аккаунт полностью'; }
+                alert('Не удалось изменить пароль: ' + (err.code || err.message) +
+                    '\\nПроверьте, что Cloud Function adminSetUserPassword развёрнута в проекте glob-data.');
             }
         }
 
+        async function clearManagedAccount(account) {
+            if (!account || account.role === 'admin' || (auth.currentUser && account.uid === auth.currentUser.uid)) {
+                alert('Этот аккаунт нельзя очистить из панели.');
+                return;
+            }
+            const confirmation = prompt(
+                'Очистка удалит документ users/' + account.uid +
+                ' и все документы global_ids, привязанные к этому UID. Пользователь в Firebase Authentication останется.\\n\\n' +
+                'Чтобы подтвердить, введите Global ID: ' + account.globalId
+            );
+            if (confirmation !== account.globalId) {
+                if (confirmation !== null) alert('Global ID не совпадает. Аккаунт не очищен.');
+                return;
+            }
+            const button = document.getElementById('clearAccountButton');
+            if (button) { button.disabled = true; button.textContent = 'Очистка…'; }
+            try {
+                const clearAccount = httpsCallable(getFunctions(app), 'adminClearAccount');
+                await clearAccount({ uid: account.uid });
+                alert('Профиль users и привязки global_ids очищены. Firebase Authentication не изменён.');
+                managedAccounts = managedAccounts.filter(u => u.uid !== account.uid);
+                document.getElementById('accountSelector').value = '';
+                window.selectAccountForManagement();
+                await window.loadManagedAccounts();
+            } catch (err) {
+                alert('Не удалось очистить аккаунт: ' + (err.code || err.message) +
+                    '\\nПроверьте, что Cloud Function adminClearAccount развёрнута в проекте glob-data.');
+                if (button) { button.disabled = false; button.textContent = '🧹 Очистить аккаунт'; }
+            }
+        }
         window.switchMainTab = (tab) => {
             currentTab = tab;
             document.querySelectorAll('.main-tab').forEach(t => t.classList.remove('active'));
