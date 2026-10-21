@@ -212,7 +212,7 @@
                     </select>
                 </div>
                 <div id="accountDetails" class="employee-card" style="display:none;"></div>
-                <p class="info-text">Можно отправить ссылку сброса на почту, задать новый пароль или перенести профильные данные выбранного пользователя в другой Global ID. При переносе профиль источника удаляется, а его Global ID привязывается к аккаунту-получателю.</p>
+                <p class="info-text">Для выбранного пользователя можно отправить на указанную почту ссылку для самостоятельного изменения пароля. Это работает через Firebase Authentication без Cloud Functions.</p>
             </div>
 
             <div id="ordersSection" style="display:none;">
@@ -935,32 +935,14 @@
                 <div style="margin:8px 0;">🆔 Global ID: <strong>${escapeHTML(account.globalId)}</strong></div>
                 <div style="margin:8px 0;">📧 Почта: <strong>${escapeHTML(account.email || 'Не указана в users')}</strong></div>
                 <div style="margin:8px 0;font-size:12px;color:#666;">UID: ${escapeHTML(account.uid)}</div>
-                <div class="form-group" style="margin-top:16px;">
-                    <label for="targetAccountSelector">Перенести данные в аккаунт (Global ID)</label>
-                    <select id="targetAccountSelector">
-                        <option value="">Выберите аккаунт-получатель…</option>
-                        ${managedAccounts.filter(u => u.uid !== account.uid && u.role !== 'admin' && !(auth.currentUser && u.uid === auth.currentUser.uid)).map(u => '<option value="' + escapeHTML(u.uid) + '">' + escapeHTML(u.globalId + ' — ' + (u.email || 'почта не указана')) + '</option>').join('')}
-                    </select>
-                </div>
-                <div class="form-group" style="margin-top:16px;">
-                    <label for="newAccountPassword">Новый пароль (не менее 8 символов)</label>
-                    <input type="password" id="newAccountPassword" minlength="8" autocomplete="new-password" placeholder="Введите новый пароль">
-                </div>
                 <div class="flex-row">
-                    <button class="btn btn-primary" id="sendResetEmailButton" ${account.email ? '' : 'disabled'}>✉️ Отправить письмо</button>
-                    <button class="btn btn-warning" id="setAccountPasswordButton" ${isSelf || isAdminAccount ? 'disabled' : ''}>🔑 Задать новый пароль</button>
-                    <button class="btn btn-danger" id="transferAccountButton" ${isSelf || isAdminAccount ? 'disabled' : ''}>🔁 Перенести данные</button>
+                    <button class="btn btn-primary" id="sendResetEmailButton" ${account.email ? '' : 'disabled'}>🔑 Отправить ссылку для изменения пароля</button>
                 </div>
-                ${isSelf ? '<p class="info-text text-danger">Нельзя изменять пароль или переносить данные собственного аккаунта администратора.</p>' : ''}
-                ${isAdminAccount && !isSelf ? '<p class="info-text text-danger">Изменение пароля и перенос данных аккаунтов администраторов запрещены.</p>' : ''}
+                ${!account.email ? '<p class="info-text text-danger">У пользователя не указана почта, поэтому отправить ссылку нельзя.</p>' : ''}
             `;
 
             const resetButton = document.getElementById('sendResetEmailButton');
             if (resetButton) resetButton.onclick = () => sendAccountPasswordReset(account);
-            const setPasswordButton = document.getElementById('setAccountPasswordButton');
-            if (setPasswordButton) setPasswordButton.onclick = () => setManagedAccountPassword(account);
-            const transferButton = document.getElementById('transferAccountButton');
-            if (transferButton) transferButton.onclick = () => transferManagedAccount(account);
         };
 
         async function sendAccountPasswordReset(account) {
@@ -977,70 +959,6 @@
             }
         }
 
-        async function setManagedAccountPassword(account) {
-            if (!account || account.role === 'admin' || (auth.currentUser && account.uid === auth.currentUser.uid)) {
-                alert('Нельзя менять пароль этого аккаунта из панели.');
-                return;
-            }
-            const input = document.getElementById('newAccountPassword');
-            const password = input ? input.value : '';
-            if (password.length < 8) {
-                alert('Новый пароль должен содержать не менее 8 символов.');
-                return;
-            }
-            if (!confirm('Задать новый пароль для ' + account.globalId + '? Передайте пароль пользователю безопасным способом.')) return;
-            try {
-                const setPassword = httpsCallable(getFunctions(app), 'adminSetUserPassword');
-                await setPassword({ uid: account.uid, password });
-                input.value = '';
-                alert('Пароль обновлён. Пользователь сможет войти с новым паролем.');
-            } catch (err) {
-                alert('Не удалось изменить пароль: ' + (err.code || err.message) +
-                    '\\nПроверьте, что Cloud Function adminSetUserPassword развёрнута в проекте glob-data.');
-            }
-        }
-
-        async function transferManagedAccount(sourceAccount) {
-            if (!sourceAccount || sourceAccount.role === 'admin' ||
-                (auth.currentUser && sourceAccount.uid === auth.currentUser.uid)) {
-                alert('Нельзя переносить данные этого аккаунта.');
-                return;
-            }
-
-            const targetUid = document.getElementById('targetAccountSelector')?.value;
-            const target = managedAccounts.find(u => u.uid === targetUid);
-            if (!target || target.uid === sourceAccount.uid || target.role === 'admin' ||
-                (auth.currentUser && target.uid === auth.currentUser.uid)) {
-                alert('Выберите допустимый аккаунт-получатель из списка.');
-                return;
-            }
-            const confirmation = prompt(
-                'Будут объединены профильные данные users и employee_training, ' +
-                'а привязки global_ids источника перейдут получателю. Профиль источника будет удалён, ' +
-                'но его Firebase Authentication останется.\\n\\n' +
-                'Источник: ' + sourceAccount.globalId + '\\nПолучатель: ' + target.globalId +
-                '\\n\\nДля подтверждения введите Global ID получателя:'
-            );
-            if (confirmation !== target.globalId) {
-                if (confirmation !== null) alert('Global ID получателя не совпадает. Перенос отменён.');
-                return;
-            }
-
-            const button = document.getElementById('transferAccountButton');
-            if (button) { button.disabled = true; button.textContent = 'Перенос…'; }
-            try {
-                const transfer = httpsCallable(getFunctions(app), 'adminTransferAccountData');
-                await transfer({ sourceUid: sourceAccount.uid, targetUid: target.uid });
-                alert('Данные перенесены в ' + target.globalId + '. Профиль источника и его прежние привязки перенесены/удалены; Firebase Authentication источника оставлен.');
-                await window.loadManagedAccounts();
-                document.getElementById('accountSelector').value = target.uid;
-                window.selectAccountForManagement();
-            } catch (err) {
-                alert('Не удалось перенести данные: ' + (err.code || err.message) +
-                    '\\nПроверьте, что Cloud Function adminTransferAccountData развёрнута в проекте glob-data.');
-                if (button) { button.disabled = false; button.textContent = '🔁 Перенести данные'; }
-            }
-        }
         window.switchMainTab = (tab) => {
             currentTab = tab;
             document.querySelectorAll('.main-tab').forEach(t => t.classList.remove('active'));
