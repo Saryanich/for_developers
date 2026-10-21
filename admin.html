@@ -212,7 +212,7 @@
                     </select>
                 </div>
                 <div id="accountDetails" class="employee-card" style="display:none;"></div>
-                <p class="info-text">Для выбранного пользователя можно отправить на указанную почту ссылку для самостоятельного изменения пароля. Это работает через Firebase Authentication без Cloud Functions.</p>
+                <p class="info-text">Администратор может вручную задать новый пароль выбранному пользователю. Для этого требуется серверная Cloud Function в Firebase.</p>
             </div>
 
             <div id="ordersSection" style="display:none;">
@@ -935,27 +935,41 @@
                 <div style="margin:8px 0;">🆔 Global ID: <strong>${escapeHTML(account.globalId)}</strong></div>
                 <div style="margin:8px 0;">📧 Почта: <strong>${escapeHTML(account.email || 'Не указана в users')}</strong></div>
                 <div style="margin:8px 0;font-size:12px;color:#666;">UID: ${escapeHTML(account.uid)}</div>
-                <div class="flex-row">
-                    <button class="btn btn-primary" id="sendResetEmailButton" ${account.email ? '' : 'disabled'}>🔑 Отправить ссылку для изменения пароля</button>
+                <div class="form-group" style="margin-top:16px;">
+                    <label for="newAccountPassword">Новый пароль (не менее 8 символов)</label>
+                    <input type="password" id="newAccountPassword" minlength="8" autocomplete="new-password" placeholder="Введите новый пароль">
                 </div>
-                ${!account.email ? '<p class="info-text text-danger">У пользователя не указана почта, поэтому отправить ссылку нельзя.</p>' : ''}
+                <div class="flex-row">
+                    <button class="btn btn-warning" id="setAccountPasswordButton" ${isSelf || isAdminAccount ? 'disabled' : ''}>🔑 Задать новый пароль</button>
+                </div>
+                ${isSelf ? '<p class="info-text text-danger">Нельзя изменять пароль собственного аккаунта администратора.</p>' : ''}
+                ${isAdminAccount && !isSelf ? '<p class="info-text text-danger">Изменение пароля аккаунтов администраторов запрещено.</p>' : ''}
             `;
 
-            const resetButton = document.getElementById('sendResetEmailButton');
-            if (resetButton) resetButton.onclick = () => sendAccountPasswordReset(account);
+            const setPasswordButton = document.getElementById('setAccountPasswordButton');
+            if (setPasswordButton) setPasswordButton.onclick = () => setManagedAccountPassword(account);
         };
 
-        async function sendAccountPasswordReset(account) {
-            if (!account.email) {
-                alert('У пользователя не указана почта в документе users.');
+        async function setManagedAccountPassword(account) {
+            if (!account || account.role === 'admin' || (auth.currentUser && account.uid === auth.currentUser.uid)) {
+                alert('Нельзя менять пароль этого аккаунта из панели.');
                 return;
             }
-            if (!confirm('Отправить ссылку для восстановления пароля на ' + account.email + '?')) return;
+            const input = document.getElementById('newAccountPassword');
+            const password = input ? input.value : '';
+            if (password.length < 8) {
+                alert('Новый пароль должен содержать не менее 8 символов.');
+                return;
+            }
+            if (!confirm('Задать новый пароль для ' + account.globalId + '? Передайте пароль пользователю безопасным способом.')) return;
             try {
-                await sendPasswordResetEmail(auth, account.email);
-                alert('Письмо для восстановления пароля отправлено на ' + account.email + '.');
+                const setPassword = httpsCallable(getFunctions(app), 'adminSetUserPassword');
+                await setPassword({ uid: account.uid, password });
+                input.value = '';
+                alert('Пароль обновлён. Пользователь сможет войти с новым паролем.');
             } catch (err) {
-                alert('Не удалось отправить письмо: ' + (err.code || err.message));
+                alert('Не удалось изменить пароль: ' + (err.code || err.message) +
+                    '\\nДля прямой смены пароля администратором требуется развёрнутая Cloud Function adminSetUserPassword в проекте glob-data.');
             }
         }
 
