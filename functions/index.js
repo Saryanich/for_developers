@@ -5,7 +5,7 @@ const { getFirestore } = require("firebase-admin/firestore");
 
 initializeApp();
 
-
+ 
 async function requireAdmin(request) {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Требуется вход администратора.");
