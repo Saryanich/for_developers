@@ -212,7 +212,7 @@
                     </select>
                 </div>
                 <div id="accountDetails" class="employee-card" style="display:none;"></div>
-                <p class="info-text">Можно отправить ссылку сброса на почту или задать новый пароль вручную. «Очистить аккаунт» удаляет профиль users и привязки global_ids, но оставляет пользователя в Firebase Authentication.</p>
+                <p class="info-text">Можно отправить ссылку сброса на почту, задать новый пароль или перенести профильные данные выбранного пользователя в другой Global ID. При переносе профиль источника удаляется, а его Global ID привязывается к аккаунту-получателю.</p>
             </div>
 
             <div id="ordersSection" style="display:none;">
@@ -942,18 +942,18 @@
                 <div class="flex-row">
                     <button class="btn btn-primary" id="sendResetEmailButton" ${account.email ? '' : 'disabled'}>✉️ Отправить письмо</button>
                     <button class="btn btn-warning" id="setAccountPasswordButton" ${isSelf || isAdminAccount ? 'disabled' : ''}>🔑 Задать новый пароль</button>
-                    <button class="btn btn-danger" id="clearAccountButton" ${isSelf || isAdminAccount ? 'disabled' : ''}>🧹 Очистить аккаунт</button>
+                    <button class="btn btn-danger" id="transferAccountButton" ${isSelf || isAdminAccount ? 'disabled' : ''}>🔁 Перенести данные</button>
                 </div>
-                ${isSelf ? '<p class="info-text text-danger">Нельзя изменять пароль или очищать собственный аккаунт администратора.</p>' : ''}
-                ${isAdminAccount && !isSelf ? '<p class="info-text text-danger">Изменение пароля и очистка аккаунтов администраторов запрещены.</p>' : ''}
+                ${isSelf ? '<p class="info-text text-danger">Нельзя изменять пароль или переносить данные собственного аккаунта администратора.</p>' : ''}
+                ${isAdminAccount && !isSelf ? '<p class="info-text text-danger">Изменение пароля и перенос данных аккаунтов администраторов запрещены.</p>' : ''}
             `;
 
             const resetButton = document.getElementById('sendResetEmailButton');
             if (resetButton) resetButton.onclick = () => sendAccountPasswordReset(account);
             const setPasswordButton = document.getElementById('setAccountPasswordButton');
             if (setPasswordButton) setPasswordButton.onclick = () => setManagedAccountPassword(account);
-            const clearButton = document.getElementById('clearAccountButton');
-            if (clearButton) clearButton.onclick = () => clearManagedAccount(account);
+            const transferButton = document.getElementById('transferAccountButton');
+            if (transferButton) transferButton.onclick = () => transferManagedAccount(account);
         };
 
         async function sendAccountPasswordReset(account) {
@@ -993,34 +993,57 @@
             }
         }
 
-        async function clearManagedAccount(account) {
-            if (!account || account.role === 'admin' || (auth.currentUser && account.uid === auth.currentUser.uid)) {
-                alert('Этот аккаунт нельзя очистить из панели.');
+        async function transferManagedAccount(sourceAccount) {
+            if (!sourceAccount || sourceAccount.role === 'admin' ||
+                (auth.currentUser && sourceAccount.uid === auth.currentUser.uid)) {
+                alert('Нельзя переносить данные этого аккаунта.');
+                return;
+            }
+
+            const candidates = managedAccounts.filter(u =>
+                u.uid !== sourceAccount.uid && u.role !== 'admin' &&
+                !(auth.currentUser && u.uid === auth.currentUser.uid)
+            );
+            if (!candidates.length) {
+                alert('Нет подходящих аккаунтов-получателей. Нужен другой пользователь не с ролью admin.');
+                return;
+            }
+
+            const chosen = prompt(
+                'Выберите Global ID аккаунта-получателя, введя его точно:\\n\\n' +
+                candidates.map(u => u.globalId + ' — ' + (u.email || 'почта не указана')).join('\\n')
+            );
+            if (chosen === null) return;
+            const target = candidates.find(u => u.globalId === chosen.trim());
+            if (!target) {
+                alert('Такой Global ID не найден в списке. Данные не перенесены.');
                 return;
             }
             const confirmation = prompt(
-                'Очистка удалит документ users/' + account.uid +
-                ' и все документы global_ids, привязанные к этому UID. Пользователь в Firebase Authentication останется.\\n\\n' +
-                'Чтобы подтвердить, введите Global ID: ' + account.globalId
+                'Будут объединены профильные данные users и employee_training, ' +
+                'а привязки global_ids источника перейдут получателю. Профиль источника будет удалён, ' +
+                'но его Firebase Authentication останется.\\n\\n' +
+                'Источник: ' + sourceAccount.globalId + '\\nПолучатель: ' + target.globalId +
+                '\\n\\nДля подтверждения введите Global ID получателя:'
             );
-            if (confirmation !== account.globalId) {
-                if (confirmation !== null) alert('Global ID не совпадает. Аккаунт не очищен.');
+            if (confirmation !== target.globalId) {
+                if (confirmation !== null) alert('Global ID получателя не совпадает. Перенос отменён.');
                 return;
             }
-            const button = document.getElementById('clearAccountButton');
-            if (button) { button.disabled = true; button.textContent = 'Очистка…'; }
+
+            const button = document.getElementById('transferAccountButton');
+            if (button) { button.disabled = true; button.textContent = 'Перенос…'; }
             try {
-                const clearAccount = httpsCallable(getFunctions(app), 'adminClearAccount');
-                await clearAccount({ uid: account.uid });
-                alert('Профиль users и привязки global_ids очищены. Firebase Authentication не изменён.');
-                managedAccounts = managedAccounts.filter(u => u.uid !== account.uid);
-                document.getElementById('accountSelector').value = '';
-                window.selectAccountForManagement();
+                const transfer = httpsCallable(getFunctions(app), 'adminTransferAccountData');
+                await transfer({ sourceUid: sourceAccount.uid, targetUid: target.uid });
+                alert('Данные перенесены в ' + target.globalId + '. Профиль источника и его прежние привязки перенесены/удалены; Firebase Authentication источника оставлен.');
                 await window.loadManagedAccounts();
+                document.getElementById('accountSelector').value = target.uid;
+                window.selectAccountForManagement();
             } catch (err) {
-                alert('Не удалось очистить аккаунт: ' + (err.code || err.message) +
-                    '\\nПроверьте, что Cloud Function adminClearAccount развёрнута в проекте glob-data.');
-                if (button) { button.disabled = false; button.textContent = '🧹 Очистить аккаунт'; }
+                alert('Не удалось перенести данные: ' + (err.code || err.message) +
+                    '\\nПроверьте, что Cloud Function adminTransferAccountData развёрнута в проекте glob-data.');
+                if (button) { button.disabled = false; button.textContent = '🔁 Перенести данные'; }
             }
         }
         window.switchMainTab = (tab) => {
