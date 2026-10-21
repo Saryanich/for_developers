@@ -162,6 +162,7 @@
                 <button class="main-tab" onclick="switchMainTab('joinRequests')">📝 Заявки</button>
                 <button class="main-tab" onclick="switchMainTab('orders')">📦 Заказы IT Global</button>
                 <button class="main-tab" onclick="switchMainTab('trainingStudents')">🎓 Учащиеся сотрудники</button>
+                <button class="main-tab" onclick="switchMainTab('accounts')">🔐 Аккаунты</button>
             </div>
             
             <div id="employeesSection">
@@ -197,6 +198,21 @@
             <div id="trainingStudentsSection" style="display:none;">
                 <div class="flex-row" style="margin-bottom:16px;align-items:center;"><button class="btn btn-primary" onclick="loadTrainingStudents()">↻ Обновить прогресс</button><span class="info-text" id="trainingStudentsStatus" role="status" aria-live="polite"></span></div>
                 <div class="stats-grid" id="trainingStudentsStats"></div><div id="trainingStudentsList">Загрузка...</div>
+            </div>
+
+            <div id="accountsSection" style="display:none;">
+                <div class="flex-row" style="margin-bottom:16px;align-items:center;">
+                    <button class="btn btn-primary" onclick="loadManagedAccounts()">↻ Загрузить аккаунты</button>
+                    <span class="info-text" id="accountsStatus" role="status" aria-live="polite"></span>
+                </div>
+                <div class="form-group">
+                    <label for="accountSelector">Пользователь — Global ID и почта</label>
+                    <select id="accountSelector" onchange="selectAccountForManagement()">
+                        <option value="">Сначала загрузите аккаунты…</option>
+                    </select>
+                </div>
+                <div id="accountDetails" class="employee-card" style="display:none;"></div>
+                <p class="info-text">«Восстановить пароль» отправляет ссылку сброса пароля на почту пользователя. Удаление аккаунта необратимо.</p>
             </div>
 
             <div id="ordersSection" style="display:none;">
@@ -305,8 +321,9 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getAuth, signOut, onAuthStateChanged, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         import { getFirestore, doc, getDoc, getDocs, updateDoc, deleteDoc, collection, query, where, addDoc, orderBy, Timestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyA6GGJxAiao77U7_9mBUEjftmS_FnSWbIw",
@@ -326,6 +343,7 @@
         let ordersBusy = false;
         let currentEmployeeId = null;
         let currentEmployeePoints = 0;
+        let managedAccounts = [];
         const escapeHTML = (value) => String(value ?? '—').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 
         // ========== СОТРУДНИКИ ==========
@@ -867,6 +885,116 @@
           } catch(err) { alert('Не удалось утвердить уровень: '+err.message); }
         };
         
+        // ========== УПРАВЛЕНИЕ АККАУНТАМИ ==========
+        window.loadManagedAccounts = async () => {
+            const status = document.getElementById('accountsStatus');
+            const selector = document.getElementById('accountSelector');
+            const details = document.getElementById('accountDetails');
+            status.textContent = 'Загружаем пользователей…';
+            details.style.display = 'none';
+            try {
+                const snap = await getDocs(collection(db, 'users'));
+                managedAccounts = snap.docs
+                    .map(d => ({ uid: d.id, ...d.data() }))
+                    .filter(u => typeof u.globalId === 'string' && u.globalId.trim())
+                    .sort((a, b) => String(a.globalId).localeCompare(String(b.globalId)));
+
+                selector.innerHTML = '<option value="">Выберите Global ID…</option>' +
+                    managedAccounts.map(u => {
+                        const label = u.globalId + ' — ' + (u.email || 'почта не указана');
+                        return '<option value="' + escapeHTML(u.uid) + '">' + escapeHTML(label) + '</option>';
+                    }).join('');
+
+                status.textContent = 'Найдено аккаунтов: ' + managedAccounts.length;
+                if (!managedAccounts.length) {
+                    selector.innerHTML = '<option value="">Пользователи с Global ID не найдены</option>';
+                }
+            } catch (err) {
+                status.textContent = 'Ошибка загрузки: ' + err.message;
+                console.error('loadManagedAccounts', err);
+            }
+        };
+
+        window.selectAccountForManagement = () => {
+            const uid = document.getElementById('accountSelector').value;
+            const details = document.getElementById('accountDetails');
+            const account = managedAccounts.find(u => u.uid === uid);
+            if (!account) {
+                details.style.display = 'none';
+                details.innerHTML = '';
+                return;
+            }
+            const isSelf = auth.currentUser && auth.currentUser.uid === account.uid;
+            const isAdminAccount = account.role === 'admin';
+            details.style.display = 'block';
+            details.innerHTML = `
+                <div class="employee-header">
+                    <div><strong>${escapeHTML(account.name || account.displayName || 'Пользователь')}</strong>
+                    <span class="badge ${isAdminAccount ? 'badge-admin' : 'badge-employee'}">${escapeHTML(account.role || 'user')}</span></div>
+                </div>
+                <div style="margin:8px 0;">🆔 Global ID: <strong>${escapeHTML(account.globalId)}</strong></div>
+                <div style="margin:8px 0;">📧 Почта: <strong>${escapeHTML(account.email || 'Не указана в users')}</strong></div>
+                <div style="margin:8px 0;font-size:12px;color:#666;">UID: ${escapeHTML(account.uid)}</div>
+                <div class="flex-row" style="margin-top:16px;">
+                    <button class="btn btn-primary" id="sendResetEmailButton" ${account.email ? '' : 'disabled'}>✉️ Восстановить пароль</button>
+                    <button class="btn btn-danger" id="deleteAccountButton" ${isSelf || isAdminAccount ? 'disabled' : ''}>🗑 Удалить аккаунт полностью</button>
+                </div>
+                ${isSelf ? '<p class="info-text text-danger">Нельзя удалить собственный аккаунт администратора.</p>' : ''}
+                ${isAdminAccount && !isSelf ? '<p class="info-text text-danger">Удаление аккаунтов администраторов запрещено из панели.</p>' : ''}
+            `;
+
+            const resetButton = document.getElementById('sendResetEmailButton');
+            if (resetButton) resetButton.onclick = () => sendAccountPasswordReset(account);
+            const deleteButton = document.getElementById('deleteAccountButton');
+            if (deleteButton) deleteButton.onclick = () => deleteManagedAccount(account);
+        };
+
+        async function sendAccountPasswordReset(account) {
+            if (!account.email) {
+                alert('У пользователя не указана почта в документе users.');
+                return;
+            }
+            if (!confirm('Отправить ссылку для восстановления пароля на ' + account.email + '?')) return;
+            try {
+                await sendPasswordResetEmail(auth, account.email);
+                alert('Письмо для восстановления пароля отправлено на ' + account.email + '.');
+            } catch (err) {
+                alert('Не удалось отправить письмо: ' + (err.code || err.message));
+            }
+        }
+
+        async function deleteManagedAccount(account) {
+            if (!account || account.role === 'admin' || (auth.currentUser && account.uid === auth.currentUser.uid)) {
+                alert('Этот аккаунт нельзя удалить из панели.');
+                return;
+            }
+            const confirmation = prompt(
+                'Удаление необратимо. Будут удалены Firebase Authentication, users/' +
+                account.uid + ', запись обучения и привязки Global ID.\n\n' +
+                'Чтобы подтвердить, введите Global ID: ' + account.globalId
+            );
+            if (confirmation !== account.globalId) {
+                if (confirmation !== null) alert('Global ID не совпадает. Аккаунт не удалён.');
+                return;
+            }
+            const button = document.getElementById('deleteAccountButton');
+            if (button) { button.disabled = true; button.textContent = 'Удаление…'; }
+            try {
+                const deleteUser = httpsCallable(getFunctions(app), 'adminDeleteUser');
+                await deleteUser({ uid: account.uid });
+                alert('Аккаунт удалён из Firebase Authentication и Firestore.');
+                managedAccounts = managedAccounts.filter(u => u.uid !== account.uid);
+                const selector = document.getElementById('accountSelector');
+                selector.value = '';
+                window.selectAccountForManagement();
+                await window.loadManagedAccounts();
+            } catch (err) {
+                alert('Не удалось удалить аккаунт: ' + (err.code || err.message) +
+                    '\nПроверьте, что Cloud Function adminDeleteUser развёрнута в проекте glob-data.');
+                if (button) { button.disabled = false; button.textContent = '🗑 Удалить аккаунт полностью'; }
+            }
+        }
+
         window.switchMainTab = (tab) => {
             currentTab = tab;
             document.querySelectorAll('.main-tab').forEach(t => t.classList.remove('active'));
@@ -879,6 +1007,7 @@
             document.getElementById('joinRequestsSection').style.display = tab === 'joinRequests' ? 'block' : 'none';
             document.getElementById('ordersSection').style.display = tab === 'orders' ? 'block' : 'none';
             document.getElementById('trainingStudentsSection').style.display = tab === 'trainingStudents' ? 'block' : 'none';
+            document.getElementById('accountsSection').style.display = tab === 'accounts' ? 'block' : 'none';
             
             if (tab === 'employees') loadEmployees();
             else if (tab === 'tasks') loadTasks();
@@ -887,6 +1016,7 @@
             else if (tab === 'joinRequests') loadJoinRequests();
             else if (tab === 'orders') loadOrders(currentOrdersFilter);
             else if (tab === 'trainingStudents') loadTrainingStudents();
+            else if (tab === 'accounts') loadManagedAccounts();
         };
         
         window.logout = async () => {
