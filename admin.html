@@ -808,9 +808,20 @@
         
         window.acceptJoinRequest = async (requestId) => {
             if (!confirm('Принять кандидата в команду? После этого entrance.html разрешит переход в панель сотрудников.')) return;
-            await updateDoc(doc(db, "join_requests", requestId), { status: "accepted", reviewedAt: Timestamp.now() });
-            alert('Кандидат принят. Статус обновлён.');
-            loadJoinRequests();
+            try {
+                const requestRef = doc(db, "join_requests", requestId);
+                const requestSnap = await getDoc(requestRef);
+                if (!requestSnap.exists()) throw new Error('Заявка не найдена.');
+                const requestData = requestSnap.data();
+                if (!requestData.uid) throw new Error('В заявке отсутствует UID аккаунта Global ID.');
+                await updateDoc(doc(db, "users", requestData.uid), { role: "employee" });
+                await updateDoc(requestRef, { status: "accepted", reviewedAt: Timestamp.now() });
+                alert('Кандидат принят. Роль сотрудника и статус заявки обновлены.');
+                loadJoinRequests();
+            } catch (error) {
+                console.error('Не удалось принять кандидата:', error);
+                alert('Не удалось принять кандидата: ' + (error?.message || error));
+            }
         };
 
         window.rejectJoinRequest = async (requestId) => {
