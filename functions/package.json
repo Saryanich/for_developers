@@ -1,0 +1,17 @@
+{
+  "name": "for-developers-functions",
+  "private": true,
+  "description": "Firebase Cloud Functions for the IT Global admin panel",
+  "main": "index.js",
+  "engines": {
+    "node": "20"
+  },
+  "scripts": {
+    "serve": "firebase emulators:start --only functions",
+    "deploy": "firebase deploy --only functions:adminDeleteUser"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0",
+    "firebase-functions": "^6.0.0"
+  }
+}
