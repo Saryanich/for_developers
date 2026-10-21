@@ -783,7 +783,8 @@
             let html = '';
             for (const req of requests) {
                 const statusClass = req.status === 'pending' ? 'badge-new' : 'badge-completed';
-                const statusText = req.status === 'pending' ? '🆕 Новая' : '✅ Обработана';
+                const normalizedStatus = String(req.status || '').toLowerCase();
+                const statusText = req.status === 'pending' ? '🆕 На рассмотрении' : (['accepted','approved','hired'].includes(normalizedStatus) ? '🎉 Принят' : (['rejected','declined'].includes(normalizedStatus) ? '❌ Отклонена' : '📌 Обработана'));
                 
                 html += `
                     <div class="request-card">
@@ -796,7 +797,7 @@
                         <div><strong>🎂 Дата рождения:</strong> ${escapeHTML(req.birthdate || '—')}</div>
                         <div><strong>💭 О себе:</strong> ${escapeHTML(req.about || '—')}</div>
                         <div class="flex-row" style="margin-top: 16px;">
-                            ${req.status === 'pending' ? `<button class="btn btn-success" onclick="markRequestProcessed('${escapeHTML(req.id)}')">✅ Отметить обработанной</button>` : ''}
+                            ${req.status === 'pending' ? `<button class="btn btn-success" onclick="acceptJoinRequest('${escapeHTML(req.id)}')">🎉 Принять в команду</button><button class="btn btn-primary" onclick="markRequestProcessed('${escapeHTML(req.id)}')">📌 Отметить обработанной</button><button class="btn btn-danger" onclick="rejectJoinRequest('${escapeHTML(req.id)}')">❌ Отклонить</button>` : ''}
                             <button class="btn btn-danger" onclick="deleteRequest('${escapeHTML(req.id)}')">🗑 Удалить</button>
                         </div>
                     </div>
@@ -805,9 +806,23 @@
             document.getElementById('joinRequestsList').innerHTML = html;
         }
         
+        window.acceptJoinRequest = async (requestId) => {
+            if (!confirm('Принять кандидата в команду? После этого entrance.html разрешит переход в панель сотрудников.')) return;
+            await updateDoc(doc(db, "join_requests", requestId), { status: "accepted", reviewedAt: Timestamp.now() });
+            alert('Кандидат принят. Статус обновлён.');
+            loadJoinRequests();
+        };
+
+        window.rejectJoinRequest = async (requestId) => {
+            if (!confirm('Отклонить заявку?')) return;
+            await updateDoc(doc(db, "join_requests", requestId), { status: "rejected", reviewedAt: Timestamp.now() });
+            alert('Заявка отклонена.');
+            loadJoinRequests();
+        };
+
         window.markRequestProcessed = async (requestId) => {
-            if (confirm('Отметить заявку как обработанную?')) {
-                await updateDoc(doc(db, "join_requests", requestId), { status: "processed" });
+            if (confirm('Отметить заявку как обработанную (без принятия в команду)?')) {
+                await updateDoc(doc(db, "join_requests", requestId), { status: "processed", reviewedAt: Timestamp.now() });
                 alert('Заявка отмечена как обработанная');
                 loadJoinRequests();
             }
