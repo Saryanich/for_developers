@@ -57,6 +57,75 @@ exports.adminSetUserPassword = onCall({ region: "us-central1" }, async (request)
   return { success: true, uid };
 });
 
+exports.adminTransferAccountData = onCall({ region: "us-central1" }, async (request) => {
+  const { db, actorUid } = await requireAdmin(request);
+  const sourceUid = request.data && request.data.sourceUid;
+  const targetUid = request.data && request.data.targetUid;
+
+  validateTargetUid(sourceUid, actorUid);
+  validateTargetUid(targetUid, actorUid);
+  if (sourceUid === targetUid) {
+    throw new HttpsError("invalid-argument", "Источник и получатель должны быть разными аккаунтами.");
+  }
+
+  const source = await requireNonAdminTarget(db, sourceUid);
+  const target = await requireNonAdminTarget(db, targetUid);
+
+  // Сохраняем идентичность получателя; переносим остальные поля профиля источника.
+  const identityFields = new Set(["globalId", "email", "role", "uid", "createdAt", "created_at"]);
+  const transferredProfile = {};
+  for (const [key, value] of Object.entries(source.data)) {
+    if (!identityFields.has(key)) transferredProfile[key] = value;
+  }
+
+  const sourceTrainingRef = db.collection("employee_training").doc(sourceUid);
+  const targetTrainingRef = db.collection("employee_training").doc(targetUid);
+  const [sourceTraining, targetTraining, sourceMappings] = await Promise.all([
+    sourceTrainingRef.get(),
+    targetTrainingRef.get(),
+    db.collection("global_ids").where("uid", "==", sourceUid).get()
+  ]);
+
+  try {
+    // Профиль получателя сохраняет собственные Global ID, почту и роль.
+    await target.ref.set(transferredProfile, { merge: true });
+
+    // Объединяем запись обучения, если она есть у источника.
+    if (sourceTraining.exists) {
+      await targetTrainingRef.set(sourceTraining.data(), { merge: true });
+      await sourceTrainingRef.delete();
+    }
+
+    // Перепривязываем все Global ID источника к UID получателя.
+    for (let i = 0; i < sourceMappings.docs.length; i += 400) {
+      const batch = db.batch();
+      sourceMappings.docs.slice(i, i + 400).forEach((mapping) => {
+        batch.update(mapping.ref, { uid: targetUid });
+      });
+      await batch.commit();
+    }
+
+    // После переноса удаляем исходный профиль, чтобы не осталось дубликата.
+    await source.ref.delete();
+  } catch (error) {
+    console.error("adminTransferAccountData partially failed", {
+      sourceUid, targetUid, code: error.code, message: error.message
+    });
+    throw new HttpsError(
+      "internal",
+      "Перенос завершился не полностью. Проверьте users, employee_training и global_ids для обоих UID перед повторной попыткой."
+    );
+  }
+
+  return {
+    success: true,
+    sourceUid,
+    targetUid,
+    transferredGlobalIdMappings: sourceMappings.size,
+    transferredTraining: sourceTraining.exists
+  };
+});
+
 exports.adminClearAccount = onCall({ region: "us-central1" }, async (request) => {
   const { db, actorUid } = await requireAdmin(request);
   const uid = request.data && request.data.uid;
