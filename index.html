@@ -493,8 +493,10 @@
                     // Новое устройство — запрашиваем 2FA
                     pendingUser = { uid: userId, role: role, email: email };
                     
-                    // Генерируем 4-значный код
-                    const code = Math.floor(1000 + Math.random() * 9000).toString();
+                    // Генерируем код криптографически стойким генератором браузера.
+                    const randomValue = new Uint32Array(1);
+                    crypto.getRandomValues(randomValue);
+                    const code = String(1000 + (randomValue[0] % 9000));
                     
                     await updateDoc(doc(db, "users", userId), {
                         twoFactorCode: code,
