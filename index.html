@@ -273,7 +273,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, doc, getDoc, getDocs, updateDoc, collection, query, where, arrayUnion, Timestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, getDocs, updateDoc, collection, query, where, arrayUnion, Timestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyA6GGJxAiao77U7_9mBUEjftmS_FnSWbIw",
@@ -289,6 +289,21 @@
         const db = getFirestore();
         const authPersistenceReady = setPersistence(auth, browserLocalPersistence).catch((error) => {
             console.error("Не удалось включить постоянную авторизацию:", error);
+        });
+
+        // Следим за отзывом токена устройства в Global ID и закрываем текущую сессию.
+        let deviceRevocationUnsub = null;
+        onAuthStateChanged(auth, user => {
+            if (deviceRevocationUnsub) { deviceRevocationUnsub(); deviceRevocationUnsub = null; }
+            let token = null;
+            try { token = localStorage.getItem('itglobal_shared_device_token'); } catch {}
+            if (!user || !token) return;
+            deviceRevocationUnsub = onSnapshot(doc(db, 'users', user.uid), snap => {
+                if (snap.exists() && (snap.data().revokedDeviceTokens || []).includes(token)) {
+                    if (deviceRevocationUnsub) { deviceRevocationUnsub(); deviceRevocationUnsub = null; }
+                    signOut(auth).finally(() => location.replace('index.html?deviceRevoked=1'));
+                }
+            }, error => console.warn('Проверка отзыва устройства:', error));
         });
 
         // Переменные состояния
