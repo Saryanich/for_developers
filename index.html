@@ -361,7 +361,6 @@
             const savedUid = localStorage.getItem('iceberg_uid');
             if (!savedUid) return false;
             
-            console.log('Попытка автовхода для UID:', savedUid);
             
             // 2. Получаем отпечаток устройства
             await getDeviceInfo();
@@ -370,7 +369,6 @@
                 // 3. Проверяем, что устройство действительно запомнено в Firestore
                 const isKnown = await isDeviceKnown(savedUid);
                 if (!isKnown) {
-                    console.log('Устройство не найдено в списке известных, требуется ручной вход.');
                     localStorage.removeItem('iceberg_uid');
                     return false;
                 }
@@ -404,7 +402,6 @@
                 }).catch(() => {});
                 
                 // 7. Перенаправляем
-                console.log('Автовход успешен!');
                 if (role === 'admin') {
                     window.location.href = 'admin.html';
                 } else {
@@ -521,9 +518,7 @@
                     }
                     document.getElementById('code1').focus();
                     
-                    // В реальном приложении код отправляется на почту/в приложение
-                    // Для теста выводим в консоль
-                    console.log('2FA код (для отладки):', code);
+                    // Никогда не выводим одноразовые коды авторизации в консоль.
                     
                     // Сбрасываем кнопку входа
                     loginBtn.innerHTML = 'Войти в систему';
