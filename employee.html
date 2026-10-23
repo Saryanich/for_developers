@@ -793,7 +793,7 @@
                 }
                 currentUserId = user.uid;
                 await loadUserData();
-                if (userData.trainingRequired === true || (await getDoc(doc(db, "employee_training", user.uid))).exists()) await loadTraining();
+                if (role === "employee" || userData.trainingRequired === true || (await getDoc(doc(db, "employee_training", user.uid))).exists()) await loadTraining();
                 loadAvailableTasks();
                 loadMyTasks();
                 loadHistory();
