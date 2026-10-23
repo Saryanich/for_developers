@@ -202,6 +202,10 @@
                 <div style="font-size: 14px; opacity: 0.8; margin-top: 8px;" id="userGlobalId"></div>
             </div>
             
+            <div id="trainingFallbackWrap" style="display:none;margin:0 0 18px;">
+                <button type="button" class="btn btn-primary" id="trainingFallbackButton">🎓 Пройти обучение и тестирование</button>
+                <p style="font-size:12px;color:#64748b;margin-top:8px;">Если обучение не открылось автоматически, запустите его здесь.</p>
+            </div>
             <div class="tabs">
                 <button class="tab active" onclick="switchTab('available')">📋 Доступные задания</button>
                 <button class="tab" onclick="switchTab('myTasks')">📌 Мои задания</button>
@@ -476,13 +480,22 @@
             const snap=await getDoc(doc(db,'employee_training',currentUserId));
             trainingRecord=snap.exists()?snap.data():{uid:currentUserId,days:{},status:'in_progress',createdAt:Timestamp.now()};
             if (!snap.exists()) await setDoc(doc(db,'employee_training',currentUserId),trainingRecord);
+            const allThreeDaysPassed = [1,2,3].every(day => trainingRecord?.days?.[day]?.passed === true);
+            const finalTestSubmitted = trainingRecord?.finalAssignment?.status === 'submitted' || trainingRecord?.status === 'final_pending';
+            const trainingFinished = trainingRecord.status === 'completed' || (allThreeDaysPassed && finalTestSubmitted);
+            const fallback = document.getElementById('trainingFallbackWrap');
+            if (fallback) fallback.style.display = trainingFinished ? 'none' : 'block';
             if (trainingRecord.status==='completed') { showTrainingGate(); renderTrainingDays(3); document.getElementById('trainingContent').innerHTML='<div class="training-pulse">РЕЗУЛЬТАТ АТТЕСТАЦИИ</div><h2>Проверка завершена</h2><div class="training-status">Администратор утвердил ваш уровень программиста: <strong>'+trainingEsc(trainingRecord.programmerLevel||'—')+' / 15</strong>.</div><p class="training-lead">'+trainingEsc(trainingRecord.adminReview||'Решение принято администратором.')+'</p><div class="training-actions"><button class="training-btn" id="closeTrainingResult">Перейти в кабинет</button></div>';document.getElementById('closeTrainingResult').onclick=hideTrainingGate; return; }
+            if (trainingFinished) { hideTrainingGate(); return; }
             showTrainingGate();
             renderTrainingStage();
           } catch(err) {
             console.error('Training load failed:',err);
-            showTrainingGate();
-            document.getElementById('trainingContent').innerHTML='<h3>Не удалось загрузить обучение</h3><p class="training-note">Ошибка доступа к данным обучения. Проверьте правила Firestore для employee_training. '+trainingEsc(err.message)+'</p>';
+            hideTrainingGate();
+            const fallback = document.getElementById('trainingFallbackWrap');
+            if (fallback) fallback.style.display = 'block';
+            const button = document.getElementById('trainingFallbackButton');
+            if (button) button.textContent = '🎓 Повторить загрузку обучения';
           }
         }
         function renderTrainingStage() {
@@ -777,6 +790,14 @@
             else if (tab === 'history') loadHistory();
         };
         
+        document.getElementById('trainingFallbackButton')?.addEventListener('click', async () => {
+            if (!currentUserId) return;
+            const button = document.getElementById('trainingFallbackButton');
+            if (button) { button.disabled = true; button.textContent = 'Загрузка обучения…'; }
+            await loadTraining();
+            if (button) button.disabled = false;
+        });
+
         window.logout = async () => {
             await signOut(auth);
             window.location.href = 'index.html';
@@ -793,7 +814,11 @@
                 }
                 currentUserId = user.uid;
                 await loadUserData();
-                if (role === "employee" || userData.trainingRequired === true || (await getDoc(doc(db, "employee_training", user.uid))).exists()) await loadTraining();
+                // Обучение обязательно для каждого сотрудника; не полагаемся на trainingRequired,
+                // потому что при добавлении сотрудника это поле может отсутствовать в users/{uid}.
+                if (role === "employee" || userData.trainingRequired === true || (await getDoc(doc(db, "employee_training", user.uid))).exists()) {
+                    await loadTraining();
+                }
                 loadAvailableTasks();
                 loadMyTasks();
                 loadHistory();
