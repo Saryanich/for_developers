@@ -369,7 +369,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getAuth, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         import { getFirestore, doc, getDoc, getDocs, updateDoc, deleteDoc, collection, query, where, addDoc, orderBy, Timestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js";
 
@@ -385,6 +385,12 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth();
         const db = getFirestore();
+        setPersistence(auth, browserLocalPersistence).catch(console.warn);
+        function redirectToGlobalId() {
+            const target = new URL('/Global-ID/', window.location.origin);
+            target.searchParams.set('continue', window.location.href);
+            window.location.replace(target.href);
+        }
         
         let currentTab = 'employees';
         let currentOrdersFilter = 'new';
@@ -1234,18 +1240,27 @@
             window.location.href = 'index.html';
         };
         
-        // ========== АВТОРИЗАЦИЯ ==========
+        // ========== ЕДИНАЯ АВТОРИЗАЦИЯ GLOBAL ID ==========
         onAuthStateChanged(auth, async (user) => {
-            if (user) {
+            if (!user) { redirectToGlobalId(); return; }
+            if (!user.emailVerified) { await signOut(auth); redirectToGlobalId(); return; }
+            try {
                 const userDoc = await getDoc(doc(db, "users", user.uid));
-                const role = userDoc.data()?.role;
-                if (role !== 'admin') {
-                    window.location.href = 'employee.html';
-                } else {
-                    loadEmployees();
+                if (!userDoc.exists()) { await signOut(auth); redirectToGlobalId(); return; }
+                const data = userDoc.data() || {};
+                let token = null;
+                try { token = localStorage.getItem('itglobal_shared_device_token'); } catch {}
+                if (data.accountLocked === true || (token && (data.revokedDeviceTokens || []).includes(token))) {
+                    await signOut(auth); redirectToGlobalId(); return;
                 }
-            } else {
-                window.location.href = 'index.html';
+                if (data.role !== 'admin') {
+                    window.location.replace('employee.html');
+                    return;
+                }
+                loadEmployees();
+            } catch (error) {
+                console.error('Не удалось проверить права администратора:', error);
+                alert('Не удалось проверить авторизацию. Обновите страницу.');
             }
         });
     </script>
