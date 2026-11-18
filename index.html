@@ -290,20 +290,50 @@
         const authPersistenceReady = setPersistence(auth, browserLocalPersistence).catch((error) => {
             console.error("Не удалось включить постоянную авторизацию:", error);
         });
+        function redirectToGlobalId() {
+            const target = new URL('/Global-ID/', window.location.origin);
+            target.searchParams.set('continue', window.location.href);
+            window.location.replace(target.href);
+        }
 
-        // Следим за отзывом токена устройства в Global ID и закрываем текущую сессию.
+        // Единая авторизация IT Global: Global ID решает, кто вошёл и на каком устройстве.
         let deviceRevocationUnsub = null;
-        onAuthStateChanged(auth, user => {
+        onAuthStateChanged(auth, async user => {
             if (deviceRevocationUnsub) { deviceRevocationUnsub(); deviceRevocationUnsub = null; }
-            let token = null;
-            try { token = localStorage.getItem('itglobal_shared_device_token'); } catch {}
-            if (!user || !token) return;
-            deviceRevocationUnsub = onSnapshot(doc(db, 'users', user.uid), snap => {
-                if (snap.exists() && (snap.data().revokedDeviceTokens || []).includes(token)) {
-                    if (deviceRevocationUnsub) { deviceRevocationUnsub(); deviceRevocationUnsub = null; }
-                    signOut(auth).finally(() => location.replace('index.html?deviceRevoked=1'));
+            if (!user) { redirectToGlobalId(); return; }
+            if (!user.emailVerified) { await signOut(auth); redirectToGlobalId(); return; }
+            try {
+                const profileSnap = await getDoc(doc(db, 'users', user.uid));
+                if (!profileSnap.exists()) { await signOut(auth); redirectToGlobalId(); return; }
+                const profile = profileSnap.data() || {};
+                let token = null;
+                try { token = localStorage.getItem('itglobal_shared_device_token'); } catch {}
+                if (profile.accountLocked === true || (token && (profile.revokedDeviceTokens || []).includes(token))) {
+                    await signOut(auth); redirectToGlobalId(); return;
                 }
-            }, error => console.warn('Проверка отзыва устройства:', error));
+                if (profile.role !== 'admin' && profile.role !== 'employee') {
+                    const errorDiv = document.getElementById('errorMessage');
+                    if (errorDiv) { errorDiv.textContent = 'У этой учётной записи нет доступа к корпоративному порталу.'; errorDiv.style.display = 'block'; }
+                    return;
+                }
+                const nextPage = profile.role === 'admin' ? 'admin.html' : 'employee.html';
+                if (!window.location.pathname.endsWith('/' + nextPage)) {
+                    window.location.replace(nextPage);
+                    return;
+                }
+                if (token) {
+                    deviceRevocationUnsub = onSnapshot(doc(db, 'users', user.uid), snap => {
+                        if (snap.exists() && (snap.data().revokedDeviceTokens || []).includes(token)) {
+                            if (deviceRevocationUnsub) { deviceRevocationUnsub(); deviceRevocationUnsub = null; }
+                            signOut(auth).finally(redirectToGlobalId);
+                        }
+                    }, error => console.warn('Проверка отзыва устройства:', error));
+                }
+            } catch (error) {
+                console.error('Ошибка проверки доступа к корпоративному порталу:', error);
+                const errorDiv = document.getElementById('errorMessage');
+                if (errorDiv) { errorDiv.textContent = 'Не удалось проверить права доступа. Попробуйте обновить страницу.'; errorDiv.style.display = 'block'; }
+            }
         });
 
         // Переменные состояния
@@ -418,140 +448,9 @@
 
         // ==================== ВХОД С ПАРОЛЕМ ====================
         
-        window.login = async () => {
-            const globalId = document.getElementById('globalId').value.trim();
-            const password = document.getElementById('password').value;
-            const errorDiv = document.getElementById('errorMessage');
-            
-            errorDiv.style.display = 'none';
-            errorDiv.innerHTML = '';
-            
-            if (!globalId || !password) {
-                errorDiv.innerHTML = '❌ Заполните Global ID и пароль';
-                errorDiv.style.display = 'block';
-                return;
-            }
-            
-            await getDeviceInfo();
-            
-            try {
-                const loginBtn = document.querySelector('#loginForm .btn');
-                loginBtn.innerHTML = '⏳ Вход...';
-                loginBtn.disabled = true;
-                
-                // Ищем пользователя по globalId
-                const usersRef = collection(db, "users");
-                const q = query(usersRef, where("globalId", "==", globalId));
-                const querySnapshot = await getDocs(q);
-                
-                if (querySnapshot.empty) {
-                    throw new Error('Пользователь с таким Global ID не найден');
-                }
-                
-                const userDoc = querySnapshot.docs[0];
-                const userId = userDoc.id;
-                const userData = userDoc.data();
-                const email = userData.email;
-                const role = userData.role;
-                
-                if (!email) {
-                    throw new Error('У пользователя не указан email в базе');
-                }
-                
-                if (role !== 'admin' && role !== 'employee') {
-                    throw new Error('У вас нет доступа к корпоративному порталу');
-                }
-                
-                if (await isAccountLocked(userId)) {
-                    throw new Error('Аккаунт заблокирован');
-                }
-                
-                // Авторизация через email и пароль
-                await signInWithEmailAndPassword(auth, email, password);
-                
-                // Проверяем, новое ли устройство
-                const isKnown = await isDeviceKnown(userId);
-                
-                if (isKnown) {
-                    // Запомненное устройство — вход сразу
-                    localStorage.setItem('iceberg_uid', userId);
-                    
-                    await updateDoc(doc(db, "users", userId), {
-                        online: true,
-                        lastSeen: Timestamp.now(),
-                        icebergAccess: true,
-                        icebergLastLogin: Timestamp.now()
-                    }).catch(() => {});
-                    
-                    // Перенаправление
-                    if (role === 'admin') {
-                        window.location.href = 'admin.html';
-                    } else {
-                        window.location.href = 'employee.html';
-                    }
-                } else {
-                    // Новое устройство — запрашиваем 2FA
-                    pendingUser = { uid: userId, role: role, email: email };
-                    
-                    // Генерируем код криптографически стойким генератором без modulo bias.
-                    const randomValue = new Uint32Array(1);
-                    const codeRange = 0x100000000;
-                    const codeLimit = Math.floor(codeRange / 9000) * 9000;
-                    do { crypto.getRandomValues(randomValue); } while (randomValue[0] >= codeLimit);
-                    const code = String(1000 + (randomValue[0] % 9000));
-                    
-                    await updateDoc(doc(db, "users", userId), {
-                        twoFactorCode: code,
-                        twoFactorCodeExpires: new Date(Date.now() + 5 * 60000)
-                    });
-                    
-                    // Показываем 2FA форму
-                    document.getElementById('deviceInfo').innerHTML = `
-                        <strong>🆕 Новое устройство</strong><br>
-                        <strong>IP:</strong> ${currentIP || 'определяется...'}<br>
-                        <strong>Браузер:</strong> ${navigator.userAgent.substring(0, 50)}...<br>
-                        <strong>Введите код подтверждения</strong>
-                    `;
-                    
-                    document.getElementById('loginForm').style.display = 'none';
-                    document.getElementById('twoFactorForm').style.display = 'block';
-                    
-                    // Очищаем поля кода
-                    for (let i = 1; i <= 4; i++) {
-                        document.getElementById(`code${i}`).value = '';
-                    }
-                    document.getElementById('code1').focus();
-                    
-                    // Никогда не выводим одноразовые коды авторизации в консоль.
-                    
-                    // Сбрасываем кнопку входа
-                    loginBtn.innerHTML = 'Войти в систему';
-                    loginBtn.disabled = false;
-                }
-                
-            } catch (err) {
-                console.error(err);
-                let errorText = '❌ Ошибка входа: ';
-                if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
-                    errorText += 'Неверный пароль';
-                } else if (err.message) {
-                    errorText += err.message;
-                } else {
-                    errorText += 'Проверьте данные и попробуйте снова';
-                }
-                errorDiv.innerHTML = errorText;
-                errorDiv.style.display = 'block';
-                
-                const loginBtn = document.querySelector('#loginForm .btn');
-                if (loginBtn) {
-                    loginBtn.innerHTML = 'Войти в систему';
-                    loginBtn.disabled = false;
-                }
-            }
-        };
+        // Вход, пароль и 2FA обслуживаются только Global ID.
+        window.login = () => redirectToGlobalId();
 
-        // ==================== 2FA ПОДТВЕРЖДЕНИЕ ====================
-        
         window.verify2FA = async () => {
             const code = ['code1','code2','code3','code4'].map(id => document.getElementById(id).value).join('');
             const errorDiv = document.getElementById('twoFactorMessage');
@@ -659,8 +558,7 @@
             }
         });
 
-        // Сначала пробуем автовход
-        tryAutoLogin();
+        // Восстановление сессии выполняет Firebase Auth; входом управляет Global ID.
         
     </script>
 </body>
