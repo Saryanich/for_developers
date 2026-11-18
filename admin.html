@@ -370,7 +370,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, doc, getDoc, getDocs, updateDoc, deleteDoc, collection, query, where, addDoc, orderBy, Timestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, getDocs, updateDoc, deleteDoc, collection, query, where, addDoc, orderBy, Timestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js";
 
         const firebaseConfig = {
@@ -386,6 +386,7 @@
         const auth = getAuth();
         const db = getFirestore();
         setPersistence(auth, browserLocalPersistence).catch(console.warn);
+        let globalIdSessionUnsub = null;
         function redirectToGlobalId() {
             const target = new URL('/Global-ID/', window.location.origin);
             target.searchParams.set('continue', window.location.href);
@@ -1257,6 +1258,14 @@
                     window.location.replace('employee.html');
                     return;
                 }
+                if (globalIdSessionUnsub) { globalIdSessionUnsub(); globalIdSessionUnsub = null; }
+                globalIdSessionUnsub = onSnapshot(doc(db, "users", user.uid), snap => {
+                    const latest = snap.data() || {};
+                    if (!snap.exists() || latest.accountLocked === true || (token && (latest.revokedDeviceTokens || []).includes(token))) {
+                        if (globalIdSessionUnsub) { globalIdSessionUnsub(); globalIdSessionUnsub = null; }
+                        signOut(auth).catch(() => {}).finally(redirectToGlobalId);
+                    }
+                }, error => console.warn('Global ID admin session watcher:', error));
                 loadEmployees();
             } catch (error) {
                 console.error('Не удалось проверить права администратора:', error);
