@@ -244,7 +244,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getAuth, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         import { getFirestore, doc, getDoc, getDocs, updateDoc, addDoc, setDoc, collection, query, where, orderBy, Timestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
@@ -259,6 +259,12 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth();
         const db = getFirestore();
+        setPersistence(auth, browserLocalPersistence).catch(console.warn);
+        function redirectToGlobalId() {
+            const target = new URL('/Global-ID/', window.location.origin);
+            target.searchParams.set('continue', window.location.href);
+            window.location.replace(target.href);
+        }
         
         let currentUserId = null;
         let currentUserGlobalId = null;
@@ -804,26 +810,36 @@
         };
         
         onAuthStateChanged(auth, async (user) => {
-            if (user) {
+            if (!user) { redirectToGlobalId(); return; }
+            if (!user.emailVerified) { await signOut(auth); redirectToGlobalId(); return; }
+            try {
                 const userDoc = await getDoc(doc(db, "users", user.uid));
+                if (!userDoc.exists()) { await signOut(auth); redirectToGlobalId(); return; }
                 const userData = userDoc.data() || {};
                 const role = userData.role;
-                if (role !== 'admin' && role !== 'employee') {
-                    window.location.href = 'index.html';
+                let token = null;
+                try { token = localStorage.getItem('itglobal_shared_device_token'); } catch {}
+                if (userData.accountLocked === true || (token && (userData.revokedDeviceTokens || []).includes(token))) {
+                    await signOut(auth); redirectToGlobalId(); return;
+                }
+                if (role === 'admin') { window.location.replace('admin.html'); return; }
+                if (role !== 'employee') {
+                    window.location.replace('index.html');
                     return;
                 }
                 currentUserId = user.uid;
                 await loadUserData();
                 // Обучение обязательно для каждого сотрудника; не полагаемся на trainingRequired,
                 // потому что при добавлении сотрудника это поле может отсутствовать в users/{uid}.
-                if (role === "employee" || userData.trainingRequired === true || (await getDoc(doc(db, "employee_training", user.uid))).exists()) {
+                if (userData.trainingRequired === true || (await getDoc(doc(db, "employee_training", user.uid))).exists()) {
                     await loadTraining();
                 }
                 loadAvailableTasks();
                 loadMyTasks();
                 loadHistory();
-            } else {
-                window.location.href = 'index.html';
+            } catch (error) {
+                console.error('Не удалось проверить сессию сотрудника:', error);
+                alert('Не удалось проверить авторизацию. Обновите страницу.');
             }
         });
     </script>
