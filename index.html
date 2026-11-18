@@ -208,25 +208,12 @@
             <div class="logo-sub">Корпоративный портал</div>
         </div>
 
-        <!-- Основная форма входа -->
-        <div id="loginForm" class="card">
+        <!-- Единая авторизация через Global ID -->
+        <div id="loginForm" class="card" style="text-align:center;">
+            <h2 style="margin-bottom:10px;">Единый вход IT Global</h2>
+            <p style="color:#667085;line-height:1.6;margin-bottom:22px;">Доступ сотрудников и администраторов, подтверждение почты и проверка устройства выполняются централизованно через Global ID.</p>
             <div id="errorMessage" class="error-message"></div>
-            
-            <div class="form-group">
-                <label>🆔 Global ID</label>
-                <input type="text" id="globalId" placeholder="Ваш Global ID" autocomplete="off">
-            </div>
-
-            <div class="form-group">
-                <label>🔑 Пароль</label>
-                <input type="password" id="password" placeholder="Ваш пароль" autocomplete="current-password">
-            </div>
-
-            <button class="btn" onclick="login()">Войти в систему</button>
-            
-            <div class="info-text">
-                Введите Global ID и пароль для входа
-            </div>
+            <button class="btn" onclick="login()">Продолжить через Global ID</button>
         </div>
 
         <!-- 2FA форма (только для новых устройств) -->
