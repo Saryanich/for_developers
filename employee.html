@@ -245,7 +245,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, doc, getDoc, getDocs, updateDoc, addDoc, setDoc, collection, query, where, orderBy, Timestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, getDocs, updateDoc, addDoc, setDoc, collection, query, where, orderBy, Timestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyA6GGJxAiao77U7_9mBUEjftmS_FnSWbIw",
@@ -260,6 +260,7 @@
         const auth = getAuth();
         const db = getFirestore();
         setPersistence(auth, browserLocalPersistence).catch(console.warn);
+        let globalIdSessionUnsub = null;
         function redirectToGlobalId() {
             const target = new URL('/Global-ID/', window.location.origin);
             target.searchParams.set('continue', window.location.href);
@@ -831,6 +832,14 @@
                 await loadUserData();
                 // Обучение обязательно для каждого сотрудника; не полагаемся на trainingRequired,
                 // потому что при добавлении сотрудника это поле может отсутствовать в users/{uid}.
+                if (globalIdSessionUnsub) { globalIdSessionUnsub(); globalIdSessionUnsub = null; }
+                globalIdSessionUnsub = onSnapshot(doc(db, "users", user.uid), snap => {
+                    const latest = snap.data() || {};
+                    if (!snap.exists() || latest.accountLocked === true || (token && (latest.revokedDeviceTokens || []).includes(token))) {
+                        if (globalIdSessionUnsub) { globalIdSessionUnsub(); globalIdSessionUnsub = null; }
+                        signOut(auth).catch(() => {}).finally(redirectToGlobalId);
+                    }
+                }, error => console.warn('Global ID session watcher:', error));
                 if (userData.trainingRequired === true || (await getDoc(doc(db, "employee_training", user.uid))).exists()) {
                     await loadTraining();
                 }
